@@ -1,6 +1,6 @@
 /* Catalogue of the kids games. A game goes live by flipping its `ready` to true. */
 window.KIDS_GAMES = [
-  { slug: 'cohete-calculo',  title: 'Cohete de cálculo',  emoji: '🚀', color: '#FF6B4A', onAccent: '#FFFFFF', desc: 'Sumas y restas hasta 100',            ready: false },
+  { slug: 'cohete-calculo',  title: 'Cohete de cálculo',  emoji: '🚀', color: '#FF6B4A', onAccent: '#FFFFFF', desc: 'Sumas y restas hasta 100',            ready: true },
   { slug: 'tablas',          title: 'Tablas mágicas',     emoji: '✨', color: '#8E5BE8', onAccent: '#FFFFFF', desc: 'Tablas de multiplicar',               ready: false },
   { slug: 'reloj',           title: '¿Qué hora es?',      emoji: '🕒', color: '#3D7DE0', onAccent: '#FFFFFF', desc: 'Aprende a leer el reloj',             ready: false },
   { slug: 'la-tienda',       title: 'La tienda',          emoji: '🛒', color: '#2E9E5B', onAccent: '#FFFFFF', desc: 'Monedas y billetes de euro',          ready: false },

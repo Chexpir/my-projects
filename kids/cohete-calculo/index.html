@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Cohete de cálculo: sumas y restas hasta 100.">
+<meta name="theme-color" content="#fff8ec">
+<title>Cohete de cálculo</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .menu { display: flex; flex-direction: column; gap: 8px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0 0 4px; text-align: center; color: var(--muted); font-weight: 700; }
+  .lvl {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 6px 14px;
+    text-align: left; border: 3px solid var(--accent); border-radius: var(--radius);
+    background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--accent); cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  }
+  .lvl:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lvl:disabled { border-color: var(--line); box-shadow: none; background: #efeae0; color: var(--muted); cursor: not-allowed; }
+  .lvl__n { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+            display: grid; place-items: center; font-size: 24px; font-weight: 900; }
+  .lvl:disabled .lvl__n { background: #cfc6b4; color: #fff; }
+  .lvl__t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .lvl__name { font-size: 22px; font-weight: 900; line-height: 1.15; }
+  .lvl__sub { font-size: 20px; font-weight: 600; color: var(--muted); line-height: 1.2; }
+  .lvl__side { flex: none; font-size: 26px; }
+
+  .play { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .play-top { display: flex; align-items: center; gap: 10px; }
+  .play-top .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .play-top .k-progress { flex: 1; gap: 6px; flex-wrap: nowrap; }
+  .play-top .k-progress > i { width: 16px; height: 16px; border-width: 3px; flex: none; }
+  .play-mid { flex: 1; min-height: 0; display: flex; gap: 12px; }
+  .track {
+    position: relative; flex: none; width: 56px; border-radius: 28px; border: 2px solid var(--line);
+    background: linear-gradient(to top, #fde9d6, #dbe9ff 55%, #1f2a52); overflow: hidden;
+  }
+  .track__goal { position: absolute; top: 6px; left: 0; right: 0; text-align: center; font-size: 22px; }
+  .track__ground { position: absolute; bottom: 0; left: 0; right: 0; height: 12px; background: #8fbf6a; }
+  .rocket {
+    position: absolute; left: 50%; bottom: calc(10px + var(--step, 0) * (100% - 84px) / 10);
+    width: 40px; height: 40px; margin-left: -20px; display: grid; place-items: center;
+    transition: bottom .6s cubic-bezier(.3, 1.3, .5, 1);
+  }
+  .rocket span { display: block; font-size: 32px; line-height: 1; transform: rotate(-45deg); }
+  .q-col { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+  .q-card { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; position: relative; }
+  .q-card.is-ok { background: var(--ok-bg); border-color: var(--ok); }
+  .q-card.is-ko { background: var(--ko-bg); border-color: var(--ko); }
+  .eq {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .25em;
+    font-size: clamp(30px, 9.5vw, 60px); font-weight: 900; line-height: 1.2; font-variant-numeric: tabular-nums;
+  }
+  .eq .op { color: var(--muted); }
+  .box {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 1.7em; padding: 0 .15em; height: 1.35em;
+    border-radius: 12px; border: 3px solid var(--accent); background: #fff;
+  }
+  .box.is-ok { border-color: var(--ok); color: var(--ok); }
+  .box.is-ko { border-color: var(--ko); color: var(--ko); }
+  .box.is-ok::after { content: "\2713"; font-size: .7em; margin-left: .15em; }
+  .box.is-ko::after { content: "\2717"; font-size: .7em; margin-left: .15em; }
+  .box:empty::before { content: "\2009"; }
+  .say { flex: none; align-self: flex-start; min-width: 56px; min-height: 56px; border-radius: 50%; border: 2px solid var(--line);
+         background: var(--card); font-size: 26px; cursor: pointer; touch-action: manipulation; }
+
+  .dock { display: grid; }
+  .dock > * { grid-area: 1 / 1; }
+  .fb { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+  .fb__title { font-size: 28px; font-weight: 900; }
+  .fb__title.is-ok { color: var(--ok); }
+  .fb__title.is-ko { color: var(--ko); }
+  .fb__eq { font-size: 36px; font-weight: 900; }
+  .dots { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .dots-row { display: flex; align-items: center; gap: 12px; }
+  .dots-grp { display: flex; gap: 4px; }
+  .dot { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); }
+  .dot.b { background: #3d7de0; }
+  .dot.gone { background: transparent; border: 3px solid #8a94a0; position: relative; }
+  .dot.gone::after { content: "\00d7"; position: absolute; inset: -6px 0 0 0; text-align: center; font-size: 18px; line-height: 20px; color: #52606d; font-weight: 900; }
+  .dots-lbl { font-size: 20px; font-weight: 800; color: var(--muted); min-width: 2.2ch; text-align: right; }
+
+  /* result rocket */
+  .sky { position: relative; width: 100%; height: 96px; border-radius: 16px; overflow: hidden;
+         background: linear-gradient(to top, #fde9d6, #dbe9ff 60%, #1f2a52); }
+  .sky .ground { position: absolute; bottom: 0; left: 0; right: 0; height: 10px; background: #8fbf6a; }
+  .sky .rk-wrap { position: absolute; left: 50%; bottom: 8px; margin-left: -22px; animation: launch 1.8s cubic-bezier(.5, 0, .9, .6) .3s forwards; }
+  .sky .rk { display: block; font-size: 40px; line-height: 1; transform: rotate(-45deg); }
+  @keyframes launch { from { transform: translateY(0); } to { transform: translateY(calc(-1px * var(--h))); } }
+  @media (prefers-reduced-motion: reduce) { .sky .rk-wrap { transform: translateY(calc(-1px * var(--h))); } .rocket { transition: none; } }
+  .unlock { font-size: 22px; font-weight: 800; color: var(--ok); margin: 0; }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir nivel">
+    <div class="menu">
+      <h2>¡Elige tu misión!</h2>
+      <div id="levels" class="menu"></div>
+      <p>🔒 Gana 2 estrellas en un nivel para abrir el siguiente.</p>
+    </div>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="play-top">
+      <button type="button" class="k-btn k-btn--ghost" id="quit" aria-label="Volver a los niveles">‹ Niveles</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+    <div class="play-mid">
+      <div class="track" aria-hidden="true" id="track">
+        <span class="track__goal">⭐</span>
+        <span class="track__ground"></span>
+        <div class="rocket" id="rocket"><span>🚀</span></div>
+      </div>
+      <div class="q-col">
+        <div class="k-card q-card" id="qcard">
+          <div class="eq" id="eq" role="img"></div>
+          <button type="button" class="say" id="say" aria-label="Escuchar la pregunta">🔊</button>
+        </div>
+      </div>
+    </div>
+    <div class="dock">
+      <div class="k-numpad" id="pad"></div>
+      <div class="fb" id="fb" hidden role="status" aria-live="polite">
+        <div class="fb__title" id="fb-title"></div>
+        <div class="fb__eq" id="fb-eq"></div>
+        <div class="dots" id="fb-dots"></div>
+        <button type="button" class="k-btn k-btn--big" id="next">Siguiente</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: levels (edit here) ===== */
+  const SLUG = 'cohete-calculo';
+  const ROUND = 10;
+  const LEVELS = [
+    { n: 1, name: 'Hasta 10',     sub: '3 + 4' },
+    { n: 2, name: 'Hasta 20',     sub: '8 + 7' },
+    { n: 3, name: 'Dos cifras',   sub: '23 + 14' },
+    { n: 4, name: 'Con llevadas', sub: '27 + 15' },
+    { n: 5, name: '¿Qué falta?',  sub: '7 + ? = 12' }
+  ];
+  /* ===== end DATA ===== */
+
+  const $ = (id) => document.getElementById(id);
+  const MINUS = '−';
+  const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+
+  /* ---------- question generation ---------- */
+
+  // A question is { a, op, b, c, hide }: a op b = c, where `hide` ('a' | 'b' | 'c') is the part she types.
+  const mk = (a, op, b, hide) => ({ a, op, b, c: op === '+' ? a + b : a - b, hide: hide || 'c' });
+
+  const pools = {};
+  function basePool(level) {
+    const add = [], sub = [];
+    if (level === 1) {
+      for (const a of range(1, 9)) for (const b of range(1, 9)) if (a + b <= 10) add.push(mk(a, '+', b));
+      for (const a of range(2, 10)) for (const b of range(1, a)) sub.push(mk(a, '-', b));
+    } else if (level === 2) {
+      for (const a of range(2, 9)) for (const b of range(2, 9)) if (a + b >= 11) add.push(mk(a, '+', b));
+      for (const a of range(11, 18)) for (const b of range(2, 9)) if (b > a % 10) sub.push(mk(a, '-', b));
+    } else if (level === 3) {
+      for (const a of range(10, 89)) for (const b of range(10, 99 - a)) if (a % 10 + b % 10 <= 9) add.push(mk(a, '+', b));
+      for (const a of range(11, 99)) for (const b of range(10, a - 1)) if (a % 10 >= b % 10) sub.push(mk(a, '-', b));
+    } else if (level === 4) {
+      for (const a of range(10, 90)) for (const b of range(10, 100 - a)) if (a % 10 + b % 10 >= 10) add.push(mk(a, '+', b));
+      for (const a of range(20, 99)) for (const b of range(10, a - 1)) if (a % 10 < b % 10) sub.push(mk(a, '-', b));
+    }
+    return { add, sub };
+  }
+  function getPool(level) {
+    if (pools[level]) return pools[level];
+    let p;
+    if (level === 5) {
+      p = { add: [], sub: [] };
+      [1, 2].forEach((l) => {
+        const b = basePool(l);
+        b.add.forEach((q) => { p.add.push(mk(q.a, '+', q.b, 'a'), mk(q.a, '+', q.b, 'b')); });
+        b.sub.forEach((q) => { p.sub.push(mk(q.a, '-', q.b, 'a'), mk(q.a, '-', q.b, 'b')); });
+      });
+    } else p = basePool(level);
+    return (pools[level] = p);
+  }
+  // Same equation (or the same sum written the other way round) never twice in a round.
+  function keyOf(q) {
+    return q.op === '+' ? '+' + Math.min(q.a, q.b) + ',' + Math.max(q.a, q.b) + (q.hide === 'c' ? '' : '=' + q.c) : '-' + q.a + ',' + q.b + (q.hide === 'c' ? '' : '=' + q.c);
+  }
+  function makeRound(level, n = ROUND) {
+    const p = getPool(level);
+    const out = [], seen = new Set();
+    const take = (list, count) => {
+      for (const q of Kit.shuffle(list)) {
+        if (count <= 0) break;
+        const k = keyOf(q);
+        if (seen.has(k)) continue;
+        seen.add(k); out.push(q); count--;
+      }
+    };
+    const nAdd = Kit.randInt(Math.floor(n * 0.4), Math.ceil(n * 0.6));
+    take(p.add, nAdd);
+    take(p.sub, n - out.length);
+    take(p.add, n - out.length);
+    return Kit.shuffle(out);
+  }
+  const answerOf = (q) => q[q.hide];
+
+  function speechOf(q) {
+    const w = q.op === '+' ? 'más' : 'menos';
+    if (q.hide === 'c') return '¿Cuánto es ' + q.a + ' ' + w + ' ' + q.b + '?';
+    if (q.hide === 'b') return 'Falta un número. ' + q.a + ' ' + w + ', ¿cuánto?, es igual a ' + q.c + '.';
+    return 'Falta un número. ¿Cuánto?, ' + w + ' ' + q.b + ', es igual a ' + q.c + '.';
+  }
+  const opSym = (q) => (q.op === '+' ? '+' : MINUS);
+  const fullText = (q) => q.a + ' ' + opSym(q) + ' ' + q.b + ' = ' + q.c;
+
+  /* ---------- state ---------- */
+
+  const store = Kit.store(SLUG);
+  const load = () => store.get({ unlocked: 1, best: {} });
+  function isOpen(level, s) { return level === 1 || level <= s.unlocked || (s.best[level - 1] || 0) >= 2; }
+
+  let level = 1, queue = [], pos = 0, score = 0, results = [], typed = '', mode = 'idle'; // idle | answering | feedback
+
+  const el = { start: $('start'), play: $('play'), eq: $('eq'), card: $('qcard'), pad: $('pad'), fb: $('fb'), dots: $('dots'), rocket: $('rocket') };
+
+  /* ---------- start screen ---------- */
+
+  function showStart() {
+    mode = 'idle';
+    el.play.hidden = true;
+    el.start.hidden = false;
+    const s = load();
+    const box = $('levels');
+    box.textContent = '';
+    LEVELS.forEach((L) => {
+      const open = isOpen(L.n, s);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lvl';
+      b.disabled = !open;
+      b.dataset.level = L.n;
+      b.innerHTML = '<span class="lvl__n"></span><span class="lvl__t"><span class="lvl__name"></span><span class="lvl__sub"></span></span><span class="lvl__side"></span>';
+      b.querySelector('.lvl__n').textContent = L.n;
+      b.querySelector('.lvl__name').textContent = L.name;
+      b.querySelector('.lvl__sub').textContent = L.sub;
+      const side = b.querySelector('.lvl__side');
+      if (open) side.appendChild(Kit.stars.el(s.best[L.n] || 0, 3));
+      else { side.textContent = '🔒'; side.setAttribute('role', 'img'); side.setAttribute('aria-label', 'Bloqueado'); }
+      b.addEventListener('click', () => { Kit.sfx('tap'); startRound(L.n); });
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- round ---------- */
+
+  function startRound(n) {
+    level = n;
+    queue = makeRound(n).map((q, i) => ({ q, orig: i, rep: false }));
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    el.start.hidden = true;
+    el.play.hidden = false;
+    setRocket(0);
+    showQuestion();
+  }
+
+  function setRocket(steps) { el.rocket.style.setProperty('--step', steps); }
+
+  function renderDots() {
+    el.dots.textContent = '';
+    const cur = queue[pos];
+    results.forEach((r, i) => {
+      const d = document.createElement('i');
+      if (r === true) d.className = 'is-done';
+      else if (r === false) d.className = 'is-miss';
+      if (cur && !cur.rep && cur.orig === i) d.classList.add('is-current');
+      el.dots.appendChild(d);
+    });
+  }
+
+  function numEl(n) { const s = document.createElement('span'); s.textContent = n; return s; }
+  function opEl(t) { const s = document.createElement('span'); s.className = 'op'; s.textContent = t; return s; }
+
+  function renderEq(stateCls) {
+    const q = queue[pos].q;
+    el.eq.textContent = '';
+    const parts = [];
+    const slot = (key) => {
+      if (q.hide !== key) return numEl(q[key]);
+      const b = document.createElement('span');
+      b.className = 'box' + (stateCls ? ' ' + stateCls : '');
+      b.id = 'box';
+      b.textContent = typed;
+      return b;
+    };
+    parts.push(slot('a'), opEl(opSym(q)), slot('b'), opEl('='), slot('c'));
+    parts.forEach((p) => el.eq.appendChild(p));
+    el.eq.setAttribute('aria-label', q.hide === 'c' ? q.a + ' ' + (q.op === '+' ? 'más' : 'menos') + ' ' + q.b + ' igual a ?' : speechOf(q));
+    el.card.classList.toggle('is-ok', stateCls === 'is-ok');
+    el.card.classList.toggle('is-ko', stateCls === 'is-ko');
+  }
+
+  function showQuestion() {
+    mode = 'answering';
+    typed = '';
+    renderDots();
+    renderEq('');
+    el.fb.hidden = true;
+    el.pad.hidden = false;
+    updateGo();
+  }
+
+  function updateGo() { const go = el.pad.querySelector('.k-numpad__go'); if (go) go.disabled = typed === ''; }
+
+  function press(d) {
+    if (mode !== 'answering') return;
+    Kit.sfx('tap');
+    if (typed === '0') typed = '';
+    if (typed.length < 3) typed += d;
+    renderEq(''); updateGo();
+  }
+  function erase() {
+    if (mode !== 'answering') return;
+    Kit.sfx('tap');
+    typed = typed.slice(0, -1);
+    renderEq(''); updateGo();
+  }
+
+  /* dots shown for levels 1 and 2: two rows grouped in fives */
+  function dotRow(n, cls, label) {
+    const row = document.createElement('div');
+    row.className = 'dots-row';
+    const lbl = document.createElement('span');
+    lbl.className = 'dots-lbl'; lbl.textContent = label;
+    row.appendChild(lbl);
+    for (let i = 0; i < n; i += 5) {
+      const g = document.createElement('span');
+      g.className = 'dots-grp';
+      for (let j = i; j < Math.min(n, i + 5); j++) { const d = document.createElement('span'); d.className = 'dot ' + cls; g.appendChild(d); }
+      row.appendChild(g);
+    }
+    return row;
+  }
+  function renderDotsHelp(q) {
+    const box = $('fb-dots');
+    box.textContent = '';
+    if (level > 2) return;
+    box.setAttribute('aria-hidden', 'true');
+    if (q.op === '+') {
+      box.appendChild(dotRow(q.a, 'a', q.a));
+      box.appendChild(dotRow(q.b, 'b', q.b));
+    } else {
+      box.appendChild(dotRow(q.c, 'a', q.c));
+      box.appendChild(dotRow(q.b, 'gone', q.b));
+    }
+  }
+
+  function check() {
+    if (mode !== 'answering' || typed === '') return;
+    const item = queue[pos], q = item.q;
+    const right = parseInt(typed, 10) === answerOf(q);
+    mode = 'feedback';
+    renderEq(right ? 'is-ok' : 'is-ko');
+    el.pad.hidden = true;
+    el.fb.hidden = false;
+    const title = $('fb-title');
+    title.className = 'fb__title ' + (right ? 'is-ok' : 'is-ko');
+    if (right) {
+      Kit.sfx('ok');
+      title.textContent = '✓ ' + Kit.praise();
+      $('fb-eq').textContent = '';
+      $('fb-dots').textContent = '';
+      if (!item.rep) { score++; results[item.orig] = true; setRocket(score); }
+    } else {
+      Kit.sfx('ko');
+      title.textContent = '✗ ' + Kit.encourage();
+      $('fb-eq').textContent = fullText(q);
+      renderDotsHelp(q);
+      if (!item.rep) {
+        results[item.orig] = false;
+        const at = Math.min(queue.length, pos + 1 + Kit.randInt(2, 4));
+        queue.splice(at, 0, { q, orig: item.orig, rep: true });
+      }
+    }
+    renderDots();
+    $('next').focus({ preventScroll: true });
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    pos++;
+    if (pos >= queue.length) finish();
+    else showQuestion();
+  }
+
+  /* ---------- result ---------- */
+
+  function finish() {
+    mode = 'idle';
+    const s = load();
+    const n = Kit.stars.calc(score, ROUND);
+    const best = Object.assign({}, s.best);
+    best[level] = Math.max(best[level] || 0, n);
+    const opens = n >= 2 && level < LEVELS.length;
+    const newly = opens && !isOpen(level + 1, s);
+    store.set({ best, unlocked: Math.max(s.unlocked, opens ? level + 1 : 1) });
+
+    const extra = document.createElement('div');
+    extra.style.width = '100%';
+    const sky = document.createElement('div');
+    sky.className = 'sky';
+    sky.setAttribute('aria-hidden', 'true');
+    sky.style.setProperty('--h', 6 + score * 3.6);
+    sky.innerHTML = '<span class="ground"></span><div class="rk-wrap"><span class="rk">🚀</span></div>';
+    extra.appendChild(sky);
+    if (newly) {
+      const u = document.createElement('p');
+      u.className = 'unlock';
+      u.textContent = '🔓 ¡Nivel ' + (level + 1) + ' abierto!';
+      extra.appendChild(u);
+    }
+
+    const actions = [];
+    if (opens) actions.push({ label: 'Siguiente nivel', primary: true, onClick: () => startRound(level + 1) });
+    actions.push({ label: 'Elegir nivel', onClick: showStart });
+
+    Kit.result({ slug: SLUG, score, total: ROUND, extra, actions, onAgain: () => startRound(level) });
+  }
+
+  /* ---------- wiring ---------- */
+
+  '123456789'.split('').concat(['del', '0', 'go']).forEach((k) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    if (k === 'del') { b.textContent = 'borrar'; b.className = 'k-numpad__del'; b.addEventListener('click', erase); }
+    else if (k === 'go') { b.textContent = 'comprobar'; b.className = 'k-numpad__go'; b.addEventListener('click', check); }
+    else { b.textContent = k; b.addEventListener('click', () => press(k)); }
+    el.pad.appendChild(b);
+  });
+  $('next').addEventListener('click', next);
+  $('say').addEventListener('click', () => { if (queue[pos]) Kit.speak(speechOf(queue[pos].q), 'es'); });
+  $('quit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (el.play.hidden || document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^[0-9]$/.test(e.key)) { e.preventDefault(); press(e.key); }
+    else if (e.key === 'Backspace') { e.preventDefault(); erase(); }
+    else if (e.key === 'Enter') {
+      if (document.activeElement && document.activeElement.id === 'quit') return;
+      e.preventDefault();
+      if (mode === 'answering') check(); else if (mode === 'feedback') next();
+    }
+  });
+
+  Kit.mount({ slug: SLUG, title: 'Cohete de cálculo' });
+  showStart();
+
+  // Hooks for the automated checks (not used by the game itself).
+  window.__cohete = { LEVELS, ROUND, makeRound, answerOf, keyOf, getPool };
+})();
+</script>
+</body>
+</html>
