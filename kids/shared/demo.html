@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kit demo</title>
+<link rel="stylesheet" href="kit.css">
+<style>
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  h2 { margin: 0 0 8px; font-size: 22px; }
+  pre { margin: 8px 0 0; padding: 8px; background: #f3ede1; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+  <main class="k-screen">
+
+    <section class="k-card">
+      <h2>Voces</h2>
+      <p id="voices">Buscando voces…</p>
+      <div class="row">
+        <button class="k-btn" id="say-es">Hablar en español</button>
+        <button class="k-btn" id="say-en">Speak in English</button>
+        <button class="k-btn k-btn--ghost" id="say-slow">Despacio (0.6)</button>
+      </div>
+    </section>
+
+    <section class="k-card">
+      <h2>Sonidos y confeti</h2>
+      <div class="row">
+        <button class="k-btn" data-sfx="tap">tap</button>
+        <button class="k-btn" data-sfx="ok">ok</button>
+        <button class="k-btn" data-sfx="ko">ko</button>
+        <button class="k-btn" data-sfx="win">win</button>
+        <button class="k-btn k-btn--ghost" id="confetti">Confeti</button>
+        <button class="k-btn k-btn--ghost" id="praise">Praise / encourage</button>
+      </div>
+      <pre id="praise-out"></pre>
+    </section>
+
+    <section class="k-card">
+      <h2>Baraja (ids a, b, c, d, e)</h2>
+      <div class="row">
+        <button class="k-btn" id="deck-next">next(5)</button>
+        <button class="k-btn k-btn--ghost" id="deck-ok">mark(primero, true)</button>
+        <button class="k-btn k-btn--ghost" id="deck-ko">mark(primero, false)</button>
+        <button class="k-btn k-btn--ghost" id="deck-reset">Vaciar</button>
+      </div>
+      <pre id="deck-out"></pre>
+    </section>
+
+    <section class="k-card">
+      <h2>Store</h2>
+      <div class="row">
+        <button class="k-btn" id="store-set">set({ n: n + 1 })</button>
+        <button class="k-btn k-btn--ghost" id="store-get">get({ n: 0 })</button>
+      </div>
+      <pre id="store-out"></pre>
+    </section>
+
+    <section class="k-card">
+      <h2>Estrellas, progreso y teclado numérico</h2>
+      <div class="row">
+        <button class="k-btn" id="stars-award">award(9 de 10)</button>
+        <button class="k-btn k-btn--ghost" id="result">Pantalla de resultado</button>
+      </div>
+      <p><span class="k-muted">Mejor:</span> <span id="stars-out"></span></p>
+      <div class="k-progress" id="progress"></div>
+      <div class="row" style="margin:8px 0">
+        <button class="k-choice" id="ch-ok">Bien</button>
+        <button class="k-choice" id="ch-ko">Mal</button>
+        <button class="k-tile">A</button>
+        <button class="k-tile is-ok">B</button>
+        <button class="k-tile is-ko">C</button>
+      </div>
+      <div class="k-numpad" id="numpad"></div>
+      <p class="k-feedback" id="numpad-out"></p>
+    </section>
+
+  </main>
+</div>
+<script src="../games.js"></script>
+<script src="kit.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var show = function (id, v) { $(id).textContent = typeof v === 'string' ? v : JSON.stringify(v); };
+
+  Kit.mount({ slug: 'cohete-calculo', title: 'Kit demo' });
+
+  Kit.ready.then(function () {
+    show('voices', 'Español: ' + (Kit.canSpeak('es') ? 'sí' : 'no') + ' · Inglés: ' + (Kit.canSpeak('en') ? 'sí' : 'no'));
+  });
+  $('say-es').onclick = function () { Kit.speak('Tres por cuatro, doce.', 'es'); };
+  $('say-en').onclick = function () { Kit.speak('Hello, my favourite colour is grey.', 'en'); };
+  $('say-slow').onclick = function () { Kit.speak('The cat is on the table.', 'en', { rate: 0.6 }); };
+
+  document.querySelectorAll('[data-sfx]').forEach(function (b) {
+    b.onclick = function () { Kit.sfx(b.dataset.sfx); };
+  });
+  $('confetti').onclick = Kit.confetti;
+  $('praise').onclick = function () { show('praise-out', Kit.praise() + '  /  ' + Kit.encourage()); };
+
+  var deck = Kit.deck('kit-demo', ['a', 'b', 'c', 'd', 'e']);
+  var lastBatch = [];
+  function showDeck() { show('deck-out', 'última tanda: ' + lastBatch.join(' ') + '\nstats: ' + JSON.stringify(deck.stats())); }
+  $('deck-next').onclick = function () { lastBatch = deck.next(5); showDeck(); };
+  $('deck-ok').onclick = function () { if (lastBatch[0]) deck.mark(lastBatch[0], true); showDeck(); };
+  $('deck-ko').onclick = function () { if (lastBatch[0]) deck.mark(lastBatch[0], false); showDeck(); };
+  $('deck-reset').onclick = function () { Kit.store('kit-demo').set({ deck: {} }); showDeck(); };
+  showDeck();
+
+  var st = Kit.store('kit-demo');
+  $('store-set').onclick = function () { st.set({ n: st.get({ n: 0 }).n + 1 }); show('store-out', st.get({ n: 0 })); };
+  $('store-get').onclick = function () { show('store-out', st.get({ n: 0 })); };
+
+  function stars() { show('stars-out', JSON.stringify(Kit.stars.get('cohete-calculo'))); }
+  stars();
+  $('stars-award').onclick = function () { Kit.stars.award('cohete-calculo', 9, 10); stars(); };
+  $('result').onclick = function () {
+    Kit.result({ slug: 'cohete-calculo', score: 8, total: 10, onAgain: function () { stars(); } });
+  };
+
+  var prog = $('progress');
+  for (var i = 0; i < 10; i++) {
+    var d = document.createElement('i');
+    d.className = i < 4 ? 'is-done' : i === 4 ? 'is-miss' : i === 5 ? 'is-current' : '';
+    prog.appendChild(d);
+  }
+  $('ch-ok').onclick = function () { this.classList.add('is-ok'); Kit.sfx('ok'); };
+  $('ch-ko').onclick = function () { this.classList.add('is-ko'); Kit.sfx('ko'); };
+
+  var pad = $('numpad'), typed = '';
+  '123456789'.split('').concat(['del', '0', 'go']).forEach(function (k) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    if (k === 'del') { b.textContent = 'borrar'; b.className = 'k-numpad__del'; }
+    else if (k === 'go') { b.textContent = 'comprobar'; b.className = 'k-numpad__go'; }
+    else b.textContent = k;
+    b.onclick = function () {
+      Kit.sfx('tap');
+      if (k === 'del') typed = typed.slice(0, -1);
+      else if (k === 'go') { show('numpad-out', 'Escribiste: ' + typed); return; }
+      else if (typed.length < 3) typed += k;
+      show('numpad-out', typed);
+    };
+    pad.appendChild(b);
+  });
+})();
+</script>
+</body>
+</html>
