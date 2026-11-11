@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Typespeed: type the alphabet a to z as fast as you can, with zero mistakes. A green phosphor terminal typing game.">
+<meta name="theme-color" content="#020a04">
+<title>Typespeed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #020a04;
+    --fg: #33ff66;
+    --dim: #1a8a38;
+    --faint: #0f4a20;
+    --err: #ff4a4a;
+    --glow: 0 0 6px rgba(51, 255, 102, .75), 0 0 18px rgba(51, 255, 102, .35);
+    --glow-err: 0 0 6px rgba(255, 74, 74, .85), 0 0 20px rgba(255, 74, 74, .5);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "VT323", "Courier New", monospace;
+    font-size: 22px;
+    line-height: 1.25;
+    text-shadow: var(--glow);
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* CRT overlays */
+  body::before, body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  body::before { /* scanlines */
+    background: repeating-linear-gradient(to bottom,
+      rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, .28) 3px, rgba(0, 0, 0, .28) 4px);
+  }
+  body::after { /* vignette */
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, .65) 100%);
+  }
+
+  .screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 44px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: flicker 6s infinite;
+  }
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    48% { opacity: 1; }
+    50% { opacity: .93; }
+    52% { opacity: 1; }
+    78% { opacity: .96; }
+    80% { opacity: 1; }
+  }
+
+  .back {
+    position: fixed;
+    top: 10px;
+    left: 16px;
+    z-index: 11;
+    color: var(--dim);
+    text-decoration: none;
+    font-size: 20px;
+  }
+  .back:hover, .back:focus-visible { color: var(--fg); outline: none; }
+
+  main { width: 100%; max-width: 720px; text-align: center; }
+
+  pre.banner {
+    margin: 0 auto 6px;
+    font-family: inherit;
+    font-size: clamp(7px, 2.6vw, 20px);
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: pre;
+    overflow: hidden;
+    display: inline-block;
+    text-align: left;
+  }
+  .tagline { color: var(--dim); margin: 0 0 22px; }
+
+  /* letters */
+  .letters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin: 0 auto 22px;
+    max-width: 560px;
+  }
+  .letter {
+    width: 1.5em;
+    height: 1.7em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    border: 1px solid var(--faint);
+    color: var(--fg);
+    text-transform: lowercase;
+  }
+  .letter.done { color: var(--dim); border-color: var(--faint); text-shadow: none; opacity: .55; }
+  .letter.next {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+    text-shadow: none;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { background: transparent; color: var(--fg); text-shadow: var(--glow); } }
+
+  /* status + timer */
+  .status { min-height: 1.3em; font-size: 28px; letter-spacing: .08em; }
+  .status.hint { color: var(--dim); }
+  .timer { font-size: clamp(56px, 18vw, 110px); line-height: 1.05; margin: 4px 0; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+  body[data-state="ready"] .timer { color: var(--dim); text-shadow: none; }
+  body[data-state="finished"] .timer { animation: pop .35s ease-out; }
+  @keyframes pop { from { transform: scale(1.12); } to { transform: scale(1); } }
+  .record { min-height: 1.3em; font-size: 28px; }
+  .retry { color: var(--dim); min-height: 1.3em; margin-top: 4px; }
+  .err-detail { min-height: 1.3em; color: var(--err); text-shadow: var(--glow-err); margin-top: 6px; }
+
+  /* error flash */
+  .screen.flash .status,
+  .screen.flash .timer { color: var(--err); text-shadow: var(--glow-err); }
+  .screen.flash .letter { border-color: var(--err); }
+  .screen.flash { animation: shake .4s linear, flicker 6s infinite; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-5px); }
+    40% { transform: translateX(5px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+  }
+
+  /* scores */
+  .scores { margin: 26px auto 0; padding-top: 14px; border-top: 1px dashed var(--faint); max-width: 360px; text-align: left; }
+  .best { display: flex; justify-content: space-between; }
+  .history { list-style: none; margin: 8px 0 0; padding: 0; color: var(--dim); }
+  .history li { display: flex; justify-content: space-between; }
+  .history li.is-best { color: var(--fg); }
+  .history:empty::before { content: "no runs yet"; }
+  button.link {
+    background: none; border: 0; padding: 0; margin-top: 12px;
+    font: inherit; font-size: 18px; color: var(--dim); cursor: pointer; text-shadow: none;
+  }
+  button.link:hover, button.link:focus-visible { color: var(--fg); outline: none; }
+
+  /* hidden input for soft keyboards */
+  #kbd {
+    position: fixed; left: 0; top: 0;
+    width: 1px; height: 1px;
+    opacity: 0; border: 0; padding: 0;
+    font-size: 16px; /* prevents iOS zoom on focus */
+    pointer-events: none;
+  }
+
+  @media (max-width: 420px) {
+    body { font-size: 20px; }
+    .letter { font-size: 24px; }
+    .letters { gap: 4px; }
+    .status, .record { font-size: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .screen, .screen.flash, body[data-state="finished"] .timer { animation: none; }
+    .letter.next { animation: none; }
+  }
+</style>
+</head>
+<body data-state="ready">
+<a class="back" href="../">&lt; back</a>
+
+<div class="screen" id="screen">
+  <main>
+    <pre class="banner" aria-label="TYPESPEED">##### #   # ####  #####  #### ####  ##### ##### ####
+  #    # #  #   # #     #     #   # #     #     #   #
+  #     #   ####  ####   ###  ####  ####  ####  #   #
+  #     #   #     #         # #     #     #     #   #
+  #     #   #     ##### ####  #     ##### ##### ####</pre>
+    <p class="tagline">type a to z. zero mistakes.</p>
+
+    <div class="letters" id="letters" aria-hidden="true"></div>
+
+    <div class="status" id="status" role="status" aria-live="polite">PRESS A TO START</div>
+    <div class="timer" id="timer">00.000 s</div>
+    <div class="record" id="record"></div>
+    <div class="retry" id="retry"></div>
+    <div class="err-detail" id="errDetail"></div>
+
+    <section class="scores">
+      <div class="best"><span>BEST</span><span id="best">--.--- s</span></div>
+      <ul class="history" id="history"></ul>
+      <button type="button" class="link" id="reset">[reset record]</button>
+    </section>
+  </main>
+</div>
+
+<input id="kbd" type="text" inputmode="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Type here" tabindex="-1">
+
+<script>
+(() => {
+  "use strict";
+
+  const ALPHABET = "abcdefghijklmnopqrstuvwxyz";
+  const STORE_KEY = "typespeed.v1";
+  const FLASH_MS = 400;
+
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    screen: $("screen"), letters: $("letters"), status: $("status"), timer: $("timer"),
+    record: $("record"), retry: $("retry"), errDetail: $("errDetail"),
+    best: $("best"), history: $("history"), reset: $("reset"), kbd: $("kbd"),
+  };
+
+  /* ---------- storage (always guarded) ---------- */
+  let data = { best: null, runs: [] };
+  function loadData() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      const p = JSON.parse(raw);
+      if (p && (typeof p.best === "number" || p.best === null) && Array.isArray(p.runs)) {
+        data = { best: p.best, runs: p.runs.filter((n) => typeof n === "number").slice(0, 5) };
+      }
+    } catch (_) { /* storage unavailable or corrupt: carry on in memory */ }
+  }
+  function saveData() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (_) { /* ignore */ }
+  }
+
+  /* ---------- state machine ---------- */
+  const State = { READY: "ready", RUNNING: "running", FINISHED: "finished" };
+  let state = State.READY;
+  let index = 0;       // index of the next expected letter
+  let startT = 0;      // performance.now() at first 'a'
+  let rafId = 0;
+  let flashTimer = 0;
+  let hintTimer = 0;
+
+  const fmt = (ms) => (ms / 1000).toFixed(3).padStart(6, "0") + " s";
+
+  function buildLetters() {
+    el.letters.textContent = "";
+    for (const ch of ALPHABET) {
+      const s = document.createElement("span");
+      s.className = "letter";
+      s.textContent = ch;
+      el.letters.appendChild(s);
+    }
+  }
+
+  function renderLetters() {
+    const kids = el.letters.children;
+    for (let i = 0; i < kids.length; i++) {
+      kids[i].className = "letter" + (i < index ? " done" : i === index && state !== State.FINISHED ? " next" : "");
+    }
+  }
+
+  function renderScores(highlight) {
+    el.best.textContent = data.best === null ? "--.--- s" : fmt(data.best);
+    el.history.textContent = "";
+    data.runs.forEach((t, i) => {
+      const li = document.createElement("li");
+      if (t === data.best) li.className = "is-best";
+      const a = document.createElement("span"); a.textContent = String(i + 1).padStart(2, "0") + ".";
+      const b = document.createElement("span"); b.textContent = fmt(t);
+      li.append(a, b);
+      el.history.appendChild(li);
+    });
+  }
+
+  function setState(next) {
+    state = next;
+    document.body.dataset.state = next;
+  }
+
+  function toReady() {
+    cancelAnimationFrame(rafId);
+    setState(State.READY);
+    index = 0;
+    startT = 0;
+    el.timer.textContent = fmt(0);
+    el.status.textContent = "PRESS A TO START";
+    el.record.textContent = "";
+    el.retry.textContent = "";
+    renderLetters();
+  }
+
+  function startRun(now) {
+    clearTimeout(flashTimer);
+    el.screen.classList.remove("flash");
+    el.errDetail.textContent = "";
+    setState(State.RUNNING);
+    startT = now;
+    index = 1; // 'a' done
+    el.status.textContent = "GO!";
+    el.record.textContent = "";
+    el.retry.textContent = "";
+    renderLetters();
+    const tick = () => {
+      if (state !== State.RUNNING) return;
+      el.timer.textContent = fmt(performance.now() - startT);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function finishRun(now) {
+    cancelAnimationFrame(rafId);
+    const elapsed = now - startT;
+    setState(State.FINISHED);
+    index = ALPHABET.length;
+    const isRecord = data.best === null || elapsed < data.best;
+    if (isRecord) data.best = elapsed;
+    data.runs = [elapsed, ...data.runs].slice(0, 5);
+    saveData();
+    el.timer.textContent = fmt(elapsed);
+    el.status.textContent = "FINISHED";
+    el.record.textContent = isRecord ? "*** NEW RECORD! ***" : "";
+    el.retry.textContent = "PRESS SPACE / ENTER TO RETRY";
+    renderLetters();
+    renderScores();
+  }
+
+  function fail(typed, expected) {
+    cancelAnimationFrame(rafId);
+    toReady();
+    el.status.textContent = "ERROR — RESTART";
+    el.errDetail.textContent = `typed "${typed.toUpperCase()}" but expected "${expected.toUpperCase()}"`;
+    el.screen.classList.remove("flash");
+    void el.screen.offsetWidth; // restart the CSS animation
+    el.screen.classList.add("flash");
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      el.screen.classList.remove("flash");
+      if (state === State.READY) el.status.textContent = "PRESS A TO START";
+    }, FLASH_MS);
+  }
+
+  function hint() {
+    el.status.classList.add("hint");
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => el.status.classList.remove("hint"), 250);
+  }
+
+  /* ---------- input handling ---------- */
+  function onLetter(ch, now) {
+    switch (state) {
+      case State.READY:
+        if (ch === "a") startRun(now); else hint();
+        break;
+      case State.RUNNING: {
+        const expected = ALPHABET[index];
+        if (ch !== expected) { fail(ch, expected); break; }
+        index++;
+        if (index === ALPHABET.length) finishRun(now); else renderLetters();
+        break;
+      }
+      case State.FINISHED:
+        toReady();
+        onLetter(ch, now); // 'a' starts immediately, others hint
+        break;
+    }
+  }
+
+  // Desktop path: keydown. Mobile soft keyboards report key "Unidentified", handled by 'input'.
+  let lastKeydownAt = -1000;
+  window.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const now = performance.now();
+
+    if (e.key === "Escape") { toReady(); el.errDetail.textContent = ""; return; }
+
+    if (e.key === " " || e.key === "Spacebar") {
+      const t = e.target;
+      if (!(t && t.closest && t.closest("button, a"))) e.preventDefault();
+      if (!e.repeat && state === State.FINISHED && !(t && t.closest && t.closest("button, a"))) toReady();
+      return;
+    }
+    if (e.key === "Enter") {
+      if (!e.repeat && state === State.FINISHED && !(e.target && e.target.closest && e.target.closest("button, a"))) toReady();
+      return;
+    }
+
+    if (e.repeat) { if (/^[a-zA-Z]$/.test(e.key)) e.preventDefault(); return; }
+    if (!/^[a-zA-Z]$/.test(e.key)) return; // Shift, Tab, digits, etc. never count
+    e.preventDefault(); // stops the matching 'input' event on the hidden field
+    lastKeydownAt = now;
+    onLetter(e.key.toLowerCase(), now);
+  });
+
+  // Mobile path: read the last character, then clear the field.
+  el.kbd.addEventListener("input", () => {
+    const now = performance.now();
+    const v = el.kbd.value;
+    el.kbd.value = "";
+    if (!v || now - lastKeydownAt < 40) return; // already counted via keydown
+    const ch = v.slice(-1);
+    if (/^[a-zA-Z]$/.test(ch)) onLetter(ch.toLowerCase(), now);
+  });
+
+  // Tap/click anywhere opens the soft keyboard.
+  function focusKbd() { try { el.kbd.focus({ preventScroll: true }); } catch (_) {} }
+  document.addEventListener("pointerdown", (e) => {
+    if (e.target.closest && e.target.closest("a")) return;
+    focusKbd();
+  });
+  el.reset.addEventListener("click", () => {
+    data = { best: null, runs: [] };
+    saveData();
+    renderScores();
+    focusKbd();
+  });
+
+  /* ---------- init ---------- */
+  loadData();
+  buildLetters();
+  renderScores();
+  toReady();
+  focusKbd();
+})();
+</script>
+</body>
+</html>
