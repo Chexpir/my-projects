@@ -5,6 +5,7 @@ A collection of small static toy web apps. One folder per project, plain HTML/CS
 ## Projects
 
 - [`typespeed/`](typespeed/) - type the alphabet a to z as fast as you can, with zero mistakes. Green phosphor CRT style.
+- [`kids/`](kids/) - small learning games for a 7-year-old (maths, time, spelling, English), in Spanish. Shared kit in `kids/shared/`, plan in [`kids/PRD.md`](kids/PRD.md).
 
 ## Run locally
 

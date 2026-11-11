@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Juegos para aprender: mates, lectura, ortografía e inglés.">
+<meta name="theme-color" content="#fff8ec">
+<title>Juegos para aprender</title>
+<link rel="stylesheet" href="shared/kit.css">
+<style>
+  .hub-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px 0; }
+  .hub-back { display: inline-flex; align-items: center; min-height: 56px; padding: 0 8px; color: var(--muted); font-weight: 800; text-decoration: none; }
+  .hub-back:hover { text-decoration: underline; }
+  h1 { margin: 0 16px 12px; font-size: clamp(30px, 7vw, 44px); font-weight: 900; line-height: 1.1; }
+  .hub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px 24px; margin: 0; list-style: none; }
+  @media (min-width: 720px) { .hub-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; } }
+  @media (min-width: 1100px) { .hub-grid { grid-template-columns: repeat(5, 1fr); } }
+  .hub-card {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%;
+    padding: 16px 10px 14px; text-align: center; text-decoration: none; color: var(--ink);
+    background: var(--card); border: 3px solid var(--c, var(--line)); border-radius: var(--radius);
+    box-shadow: 0 5px 0 var(--c, var(--line)); touch-action: manipulation;
+  }
+  a.hub-card:active { transform: translateY(2px); box-shadow: 0 3px 0 var(--c); }
+  .hub-emoji { font-size: 52px; line-height: 1; }
+  .hub-title { font-size: 22px; font-weight: 900; line-height: 1.1; }
+  .hub-desc { font-size: 20px; color: var(--muted); font-weight: 600; line-height: 1.2; }
+  .hub-stars { margin-top: auto; min-height: 30px; }
+  .hub-card.is-soon { --c: var(--line); background: #efeae0; color: var(--muted); box-shadow: none; border-style: dashed; }
+  .hub-card.is-soon .hub-emoji { filter: grayscale(1); opacity: .6; }
+  .hub-badge { margin-top: auto; padding: 2px 14px; border-radius: 999px; background: var(--muted); color: #fff; font-size: 20px; font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <div class="hub-top"><a class="hub-back" href="../">&lt; volver</a></div>
+  <h1>Juegos para aprender</h1>
+  <ul class="hub-grid" id="grid"></ul>
+</div>
+<script src="games.js"></script>
+<script src="shared/kit.js"></script>
+<script>
+(function () {
+  var grid = document.getElementById('grid');
+  window.KIDS_GAMES.forEach(function (g) {
+    var li = document.createElement('li');
+    var card = document.createElement(g.ready ? 'a' : 'div');
+    card.className = 'hub-card' + (g.ready ? '' : ' is-soon');
+    card.style.setProperty('--c', g.color);
+    if (g.ready) card.href = g.slug + '/';
+    else card.setAttribute('aria-disabled', 'true');
+
+    var emoji = document.createElement('span');
+    emoji.className = 'hub-emoji'; emoji.setAttribute('aria-hidden', 'true'); emoji.textContent = g.emoji;
+    var title = document.createElement('span');
+    title.className = 'hub-title'; title.textContent = g.title;
+    var desc = document.createElement('span');
+    desc.className = 'hub-desc'; desc.textContent = g.desc;
+    card.appendChild(emoji); card.appendChild(title); card.appendChild(desc);
+
+    if (g.ready) {
+      var s = document.createElement('span');
+      s.className = 'hub-stars';
+      s.appendChild(Kit.stars.el(Kit.stars.get(g.slug).best, 3));
+      card.appendChild(s);
+    } else {
+      var b = document.createElement('span');
+      b.className = 'hub-badge'; b.textContent = 'Pronto';
+      card.appendChild(b);
+    }
+    li.appendChild(card);
+    grid.appendChild(li);
+  });
+})();
+</script>
+</body>
+</html>
