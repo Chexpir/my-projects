@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="¿Qué hora es?: aprende a leer y a poner el reloj.">
+<meta name="theme-color" content="#fff8ec">
+<title>¿Qué hora es?</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .menu { display: flex; flex-direction: column; gap: 8px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0 0 4px; text-align: center; color: var(--muted); font-weight: 700; }
+  .lvl {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 6px 14px;
+    text-align: left; border: 3px solid var(--accent); border-radius: var(--radius);
+    background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--accent); cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  }
+  .lvl:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lvl:disabled { border-color: var(--line); box-shadow: none; background: #efeae0; color: var(--muted); cursor: not-allowed; }
+  .lvl__n { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+            display: grid; place-items: center; font-size: 24px; font-weight: 900; }
+  .lvl:disabled .lvl__n { background: #cfc6b4; color: #fff; }
+  .lvl__t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .lvl__name { font-size: 22px; font-weight: 900; line-height: 1.15; }
+  .lvl__sub { font-size: 20px; font-weight: 600; color: var(--muted); line-height: 1.2; }
+  .lvl__side { flex: none; font-size: 26px; }
+
+  .play { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .play-top { display: flex; align-items: center; gap: 10px; }
+  .play-top .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .play-top .k-progress { flex: 1; gap: 6px; flex-wrap: nowrap; }
+  .play-top .k-progress > i { width: 16px; height: 16px; border-width: 3px; flex: none; }
+  @media (max-width: 400px) { .play-top .k-progress { gap: 4px; } .play-top .k-progress > i { width: 14px; height: 14px; } .play-top .k-btn { padding: 0 12px; } }
+
+  .prompt { margin: 0; text-align: center; font-size: 22px; font-weight: 900; line-height: 1.15; }
+  .prompt.is-set { font-size: clamp(24px, 6.5vw, 34px); }
+
+  .clock-wrap { position: relative; flex: 1; min-height: 120px; }
+  .clock-wrap > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .clock-wrap.is-set > svg { touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; }
+  .say {
+    position: absolute; top: 0; right: 0; z-index: 2; min-width: 56px; min-height: 56px; border-radius: 50%;
+    border: 2px solid var(--line); background: var(--card); font-size: 26px; cursor: pointer; touch-action: manipulation;
+  }
+  .face { fill: #fff; stroke: var(--line); stroke-width: 4; }
+  .clock-wrap.is-ok .face { stroke: var(--ok); stroke-width: 7; fill: var(--ok-bg); }
+  .clock-wrap.is-ko .face { stroke: var(--ko); stroke-width: 7; fill: var(--ko-bg); }
+  .tick { stroke: #9aa5b1; stroke-width: 1.4; stroke-linecap: round; }
+  .tick.big { stroke: var(--ink); stroke-width: 3; }
+  .num { font-family: var(--font); font-weight: 900; font-size: 21px; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+  .hand { transform-origin: 100px 100px; }
+  .hand.anim { transition: transform .7s cubic-bezier(.3, 1.2, .5, 1); }
+  .hand-h line { stroke: #e0564b; stroke-width: 10; stroke-linecap: round; }
+  .hand-m line { stroke: #3d7de0; stroke-width: 6; stroke-linecap: round; }
+  .knob { fill: #3d7de0; stroke: #fff; stroke-width: 3; display: none; }
+  .clock-wrap.is-set .knob { display: block; }
+  .cap { fill: var(--ink); }
+
+  .dock { display: grid; }
+  .dock > * { grid-area: 1 / 1; }
+  .dock > .off { visibility: hidden; pointer-events: none; }
+
+  .opts { display: grid; grid-template-columns: 1fr; gap: 8px; align-content: start; }
+  .opts .k-choice { padding: 4px 12px; line-height: 1.1; text-align: center; }
+  .opts.digital { grid-template-columns: 1fr 1fr; }
+  .opts.digital .k-choice { font-size: 34px; min-height: 64px; }
+
+  .setter { display: flex; flex-direction: column; gap: 8px; }
+  .setter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .setter-grid .k-btn { padding: 0 8px; font-size: 22px; }
+  .setter .k-btn--big { min-height: 60px; }
+
+  .fb { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+  .fb__title { font-size: 28px; font-weight: 900; line-height: 1.1; }
+  .fb__title.is-ok { color: var(--ok); }
+  .fb__title.is-ko { color: var(--ko); }
+  .fb__main { font-size: 28px; font-weight: 900; line-height: 1.15; }
+  .fb__sub { font-size: 22px; font-weight: 800; color: var(--muted); line-height: 1.15; }
+  .fb__mine { font-size: 20px; font-weight: 700; color: var(--muted); line-height: 1.15; }
+  .fb .k-btn { margin-top: 4px; }
+
+  .unlock { font-size: 22px; font-weight: 800; color: var(--ok); margin: 0; }
+
+  @media (min-width: 640px) {
+    .opts { grid-template-columns: 1fr 1fr; }
+    .opts .k-choice { min-height: 72px; }
+  }
+  @media (max-height: 760px) and (max-width: 639px) {
+    .opts .k-choice { min-height: 56px; }
+    .setter .k-btn--big { min-height: 56px; }
+  }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir nivel">
+    <div class="menu">
+      <h2>¡Elige tu nivel!</h2>
+      <div id="levels" class="menu"></div>
+      <p>🔒 Gana 2 estrellas en un nivel para abrir el siguiente.</p>
+    </div>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="play-top">
+      <button type="button" class="k-btn k-btn--ghost" id="quit" aria-label="Volver a los niveles">‹ Niveles</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+    <p class="prompt" id="prompt"></p>
+    <div class="clock-wrap" id="clockwrap">
+      <svg id="clock" viewBox="0 0 200 200" role="img" aria-label="Reloj"></svg>
+      <button type="button" class="say" id="say" aria-label="Escuchar la pregunta">🔊</button>
+    </div>
+    <div class="dock">
+      <div class="opts" id="opts" role="group" aria-label="Respuestas"></div>
+      <div class="setter" id="setter" hidden>
+        <div class="setter-grid">
+          <button type="button" class="k-btn k-btn--ghost" id="m-minus" aria-label="Retroceder 5 minutos">‹ 5 min</button>
+          <button type="button" class="k-btn k-btn--ghost" id="m-plus" aria-label="Adelantar 5 minutos">5 min ›</button>
+          <button type="button" class="k-btn k-btn--ghost" id="h-minus" aria-label="Retroceder 1 hora">‹ 1 hora</button>
+          <button type="button" class="k-btn k-btn--ghost" id="h-plus" aria-label="Adelantar 1 hora">1 hora ›</button>
+        </div>
+        <button type="button" class="k-btn k-btn--big" id="check">Comprobar</button>
+      </div>
+      <div class="fb off" id="fb" role="status" aria-live="polite">
+        <div class="fb__title" id="fb-title"></div>
+        <div class="fb__main" id="fb-main"></div>
+        <div class="fb__sub" id="fb-sub"></div>
+        <div class="fb__mine" id="fb-mine"></div>
+        <button type="button" class="k-btn k-btn--big" id="next">Siguiente</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: levels and words (edit here) ===== */
+  const SLUG = 'reloj';
+  const ROUND = 10;
+  // Index = hour on a 12-hour clock, so 12 is at position 0.
+  const HOUR_WORDS = ['doce', 'una', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once'];
+  // Minutes up to :30 use "y …"; after :30 the next hour is named with "menos …".
+  const PAST = { 5: 'y cinco', 10: 'y diez', 15: 'y cuarto', 20: 'y veinte', 25: 'y veinticinco', 30: 'y media' };
+  const TO = { 35: 'menos veinticinco', 40: 'menos veinte', 45: 'menos cuarto', 50: 'menos diez', 55: 'menos cinco' };
+  // Spoken form of a digital time ("3:45" -> "tres cuarenta y cinco").
+  const MIN_SPOKEN = { 5: 'cinco', 10: 'diez', 15: 'quince', 20: 'veinte', 25: 'veinticinco', 30: 'treinta', 35: 'treinta y cinco',
+                       40: 'cuarenta', 45: 'cuarenta y cinco', 50: 'cincuenta', 55: 'cincuenta y cinco' };
+  // `minutes` = the minutes practised in the level, `review` = earlier minutes mixed in (3 of 10 items).
+  const LEVELS = [
+    { n: 1, name: 'En punto',        sub: 'Son las tres en punto', minutes: [0],                          review: [],               digital: false },
+    { n: 2, name: 'Y media',         sub: 'Son las tres y media',  minutes: [30],                         review: [0],              digital: false },
+    { n: 3, name: 'Cuartos',         sub: 'y cuarto, menos cuarto', minutes: [15, 45],                    review: [0, 30],          digital: false },
+    { n: 4, name: 'De cinco en cinco', sub: 'y diez, menos veinte', minutes: [5, 10, 20, 25, 35, 40, 50, 55], review: [0, 15, 30, 45], digital: false },
+    { n: 5, name: 'Reloj digital',   sub: '3:45',                  minutes: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], review: [], digital: true }
+  ];
+  /* ===== end DATA ===== */
+
+  const $ = (id) => document.getElementById(id);
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  /* ---------- time maths and Spanish phrases ---------- */
+
+  const hourWord = (h) => HOUR_WORDS[h % 12];
+  const tOf = (h, m) => (h % 12) * 60 + m; // minutes since 12:00, 0 to 719
+  const fromT = (t) => { const x = ((t % 720) + 720) % 720; const h = Math.floor(x / 60); return { h: h === 0 ? 12 : h, m: x % 60 }; };
+  const keyOf = (h, m) => (h % 12) + ':' + m;
+
+  // "las tres menos cuarto", "la una y media", "las cuatro en punto".
+  function phraseCore(h, m) {
+    const hh = m > 30 ? (h % 12) + 1 : h; // after :30 the next hour is named
+    const hour = hh > 12 ? 1 : hh;
+    const art = hour === 1 ? 'la' : 'las';
+    const tail = m === 0 ? 'en punto' : m <= 30 ? PAST[m] : TO[m];
+    return { art, text: art + ' ' + hourWord(hour) + ' ' + tail };
+  }
+  function timePhrase(h, m) {
+    const c = phraseCore(h, m);
+    return (c.art === 'la' ? 'Es ' : 'Son ') + c.text;
+  }
+  const digital = (h, m) => h + ':' + (m < 10 ? '0' : '') + m;
+  function digitalSpoken(h, m) {
+    const hour = h === 1 ? 'la una' : 'las ' + hourWord(h);
+    return hour + (m === 0 ? ' en punto' : ' ' + MIN_SPOKEN[m]);
+  }
+  // Hand angles in degrees clockwise from 12. The hour hand moves with the minutes.
+  function handAngles(h, m) { return { hour: (h % 12) * 30 + m * 0.5, minute: m * 6 }; }
+
+  /* ---------- clock drawing ---------- */
+
+  function svgEl(name, attrs) {
+    const e = document.createElementNS(SVGNS, name);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  const clock = $('clock');
+  let handH, handM;
+  function buildClock() {
+    clock.textContent = '';
+    clock.appendChild(svgEl('circle', { class: 'face', cx: 100, cy: 100, r: 94 }));
+    for (let i = 0; i < 60; i++) {
+      const a = (i * 6 * Math.PI) / 180, big = i % 5 === 0;
+      const r1 = big ? 80 : 85, r2 = 89;
+      clock.appendChild(svgEl('line', {
+        class: 'tick' + (big ? ' big' : ''),
+        x1: 100 + r1 * Math.sin(a), y1: 100 - r1 * Math.cos(a), x2: 100 + r2 * Math.sin(a), y2: 100 - r2 * Math.cos(a)
+      }));
+    }
+    HOURS.forEach((n) => {
+      const a = (n * 30 * Math.PI) / 180;
+      const t = svgEl('text', { class: 'num', x: 100 + 66 * Math.sin(a), y: 100 - 66 * Math.cos(a) });
+      t.textContent = n;
+      clock.appendChild(t);
+    });
+    handH = svgEl('g', { class: 'hand hand-h' });
+    handH.appendChild(svgEl('line', { x1: 100, y1: 104, x2: 100, y2: 62 }));
+    handM = svgEl('g', { class: 'hand hand-m' });
+    handM.appendChild(svgEl('line', { x1: 100, y1: 106, x2: 100, y2: 30 }));
+    handM.appendChild(svgEl('circle', { class: 'knob', cx: 100, cy: 30, r: 9 }));
+    clock.appendChild(handH);
+    clock.appendChild(handM);
+    clock.appendChild(svgEl('circle', { class: 'cap', cx: 100, cy: 100, r: 6 }));
+  }
+  // `t` is minutes since 12:00 and may be any integer, so the hands never spin backwards across 12.
+  function setHands(t, animate) {
+    handH.classList.toggle('anim', !!animate);
+    handM.classList.toggle('anim', !!animate);
+    handH.style.transform = 'rotate(' + t * 0.5 + 'deg)';
+    handM.style.transform = 'rotate(' + t * 6 + 'deg)';
+  }
+
+  /* ---------- question generation ---------- */
+
+  const allowedMinutes = (level) => {
+    const L = LEVELS[level - 1];
+    return Array.from(new Set(L.minutes.concat(L.review)));
+  };
+  const labelOf = (level, h, m) => (LEVELS[level - 1].digital ? digital(h, m) : timePhrase(h, m));
+
+  // Three plausible wrong times: hands swapped, same hour with other minutes, neighbouring hours.
+  function makeOptions(level, h, m) {
+    const A = allowedMinutes(level);
+    const used = new Set([keyOf(h, m)]);
+    const out = [];
+    const add = (hh, mm) => {
+      hh = ((hh - 1 + 12) % 12) + 1;
+      const k = keyOf(hh, mm);
+      if (used.has(k) || out.length >= 3) return false;
+      used.add(k); out.push({ h: hh, m: mm });
+      return true;
+    };
+    const pickMin = (not) => { const l = A.filter((x) => x !== not); return l.length ? Kit.sample(l, 1)[0] : not; };
+    // 1. Hands swapped: the hour hand read as minutes and the minute hand read as hours.
+    const sh = m / 5 || 12, sm = (h % 12) * 5;
+    add(sh, A.includes(sm) ? sm : pickMin(m));
+    // 2. Same hour, another minute.
+    if (A.length > 1) add(h, pickMin(m));
+    // 3. The hour before or after, same minutes.
+    Kit.shuffle([h + 1, h - 1]).forEach((x) => add(x, m));
+    // 4. Fill up with anything the level allows.
+    let guard = 0;
+    while (out.length < 3 && guard++ < 200) add(Kit.randInt(1, 12), Kit.sample(A, 1)[0]);
+    const opts = Kit.shuffle(out.concat([{ h, m, right: true }]));
+    return opts.map((o) => ({ h: o.h, m: o.m, label: labelOf(level, o.h, o.m), right: !!o.right }));
+  }
+
+  function makeRound(level, n = ROUND) {
+    const L = LEVELS[level - 1];
+    const seen = new Set(), times = [];
+    const grid = (mins) => { const l = []; HOURS.forEach((h) => mins.forEach((m) => l.push({ h, m }))); return l; };
+    const take = (list, count) => {
+      for (const x of Kit.shuffle(list)) {
+        if (count <= 0) break;
+        const k = keyOf(x.h, x.m);
+        if (seen.has(k)) continue;
+        seen.add(k); times.push(x); count--;
+      }
+    };
+    const nRev = L.review.length ? Math.round(n * 0.3) : 0;
+    take(grid(L.minutes), n - nRev);
+    take(grid(L.review), nRev);
+    take(grid(L.minutes), n - times.length);
+    const types = [];
+    for (let i = 0; i < times.length; i++) types.push(i % 2 === 0 ? 'leer' : 'poner');
+    Kit.shuffle(types);
+    return Kit.shuffle(times).map((x, i) => {
+      const q = { type: types[i], h: x.h, m: x.m };
+      if (q.type === 'leer') q.options = makeOptions(level, x.h, x.m);
+      else {
+        // The clock starts on an o'clock time with another hour, so something always has to change.
+        let sh = Kit.randInt(1, 12);
+        if (sh === x.h) sh = (sh % 12) + 1;
+        q.startT = tOf(sh, 0);
+      }
+      return q;
+    });
+  }
+
+  function promptOf(q) {
+    if (q.type === 'leer') return '¿Qué hora es?';
+    if (LEVELS[level - 1].digital) return 'Pon el reloj a ' + (q.h === 1 ? 'la ' : 'las ') + digital(q.h, q.m);
+    return 'Pon ' + phraseCore(q.h, q.m).text;
+  }
+  function speechOf(q) {
+    if (q.type === 'leer') return '¿Qué hora es?';
+    if (LEVELS[level - 1].digital) return 'Pon el reloj a ' + digitalSpoken(q.h, q.m);
+    return 'Pon ' + phraseCore(q.h, q.m).text;
+  }
+
+  /* ---------- state ---------- */
+
+  const store = Kit.store(SLUG);
+  const load = () => store.get({ unlocked: 1, best: {} });
+  function isOpen(lv, s) { return lv === 1 || lv <= s.unlocked || (s.best[lv - 1] || 0) >= 2; }
+
+  let level = 1, queue = [], pos = 0, score = 0, results = [], mode = 'idle'; // idle | answering | feedback
+  let curT = 0, dragging = false;
+
+  const el = { start: $('start'), play: $('play'), wrap: $('clockwrap'), opts: $('opts'), setter: $('setter'), fb: $('fb'), dots: $('dots') };
+
+  /* ---------- start screen ---------- */
+
+  function showStart() {
+    mode = 'idle';
+    el.play.hidden = true;
+    el.start.hidden = false;
+    const s = load();
+    const box = $('levels');
+    box.textContent = '';
+    LEVELS.forEach((L) => {
+      const open = isOpen(L.n, s);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lvl';
+      b.disabled = !open;
+      b.dataset.level = L.n;
+      b.innerHTML = '<span class="lvl__n"></span><span class="lvl__t"><span class="lvl__name"></span><span class="lvl__sub"></span></span><span class="lvl__side"></span>';
+      b.querySelector('.lvl__n').textContent = L.n;
+      b.querySelector('.lvl__name').textContent = L.name;
+      b.querySelector('.lvl__sub').textContent = L.sub;
+      const side = b.querySelector('.lvl__side');
+      if (open) side.appendChild(Kit.stars.el(s.best[L.n] || 0, 3));
+      else { side.textContent = '🔒'; side.setAttribute('role', 'img'); side.setAttribute('aria-label', 'Bloqueado'); }
+      b.addEventListener('click', () => { Kit.sfx('tap'); startRound(L.n); });
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- round ---------- */
+
+  function startRound(n) {
+    level = n;
+    queue = makeRound(n).map((q, i) => ({ q, orig: i, rep: false }));
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    el.start.hidden = true;
+    el.play.hidden = false;
+    showQuestion();
+  }
+
+  function renderDots() {
+    el.dots.textContent = '';
+    const cur = queue[pos];
+    results.forEach((r, i) => {
+      const d = document.createElement('i');
+      if (r === true) d.className = 'is-done';
+      else if (r === false) d.className = 'is-miss';
+      if (cur && !cur.rep && cur.orig === i) d.classList.add('is-current');
+      el.dots.appendChild(d);
+    });
+  }
+
+  function setPhase(answering) {
+    el.fb.classList.toggle('off', answering);
+    el.opts.classList.toggle('off', !answering);
+    el.setter.classList.toggle('off', !answering);
+    el.fb.inert = answering;
+    el.opts.inert = !answering;
+    el.setter.inert = !answering;
+  }
+
+  function showQuestion() {
+    mode = 'answering';
+    const q = queue[pos].q;
+    renderDots();
+    const isSet = q.type === 'poner';
+    el.wrap.className = 'clock-wrap' + (isSet ? ' is-set' : '');
+    $('prompt').textContent = promptOf(q);
+    $('prompt').classList.toggle('is-set', isSet);
+    el.opts.hidden = isSet;
+    el.setter.hidden = !isSet;
+    clock.setAttribute('aria-label', isSet ? 'Reloj para poner la hora' : 'Reloj');
+    if (isSet) {
+      curT = q.startT;
+      setHands(curT, false);
+    } else {
+      setHands(tOf(q.h, q.m), false);
+      renderOptions(q);
+    }
+    setPhase(true);
+  }
+
+  function renderOptions(q) {
+    el.opts.textContent = '';
+    el.opts.classList.toggle('digital', LEVELS[level - 1].digital);
+    q.options.forEach((o, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'k-choice';
+      b.dataset.i = i;
+      b.textContent = o.label;
+      b.addEventListener('click', () => choose(i));
+      el.opts.appendChild(b);
+    });
+  }
+
+  /* ---------- answering ---------- */
+
+  function showFeedback(right, item, mine) {
+    const q = item.q, dig = LEVELS[level - 1].digital;
+    mode = 'feedback';
+    setPhase(false);
+    el.wrap.classList.add(right ? 'is-ok' : 'is-ko');
+    const title = $('fb-title');
+    title.className = 'fb__title ' + (right ? 'is-ok' : 'is-ko');
+    title.textContent = right ? '✓ ' + Kit.praise() : '✗ ' + Kit.encourage();
+    $('fb-main').textContent = dig ? digital(q.h, q.m) : timePhrase(q.h, q.m);
+    $('fb-sub').textContent = dig ? timePhrase(q.h, q.m) : digital(q.h, q.m);
+    $('fb-mine').textContent = right || !mine ? '' : mine;
+    Kit.sfx(right ? 'ok' : 'ko');
+    setTimeout(() => { if (mode === 'feedback') Kit.speak(timePhrase(q.h, q.m) + '.', 'es'); }, 350);
+    if (!item.rep) {
+      if (right) { score++; results[item.orig] = true; }
+      else {
+        results[item.orig] = false;
+        const at = Math.min(queue.length, pos + 1 + Kit.randInt(2, 4));
+        queue.splice(at, 0, { q, orig: item.orig, rep: true });
+      }
+    }
+    renderDots();
+    $('next').focus({ preventScroll: true });
+  }
+
+  function choose(i) {
+    if (mode !== 'answering') return;
+    const item = queue[pos], q = item.q;
+    if (q.type !== 'leer') return;
+    const o = q.options[i];
+    showFeedback(o.right, item, o.right ? '' : 'Elegiste: ' + o.label);
+  }
+
+  function check() {
+    if (mode !== 'answering') return;
+    const item = queue[pos], q = item.q;
+    if (q.type !== 'poner') return;
+    const target = tOf(q.h, q.m);
+    const norm = ((curT % 720) + 720) % 720;
+    const right = norm === target;
+    let mine = '';
+    if (!right) {
+      const w = fromT(curT);
+      mine = 'Tu reloj marcaba: ' + labelOf(level, w.h, w.m);
+      // Move the hands to the right time by the shortest way round.
+      let d = (((target - curT) % 720) + 720) % 720;
+      if (d > 360) d -= 720;
+      curT += d;
+      setHands(curT, true);
+    }
+    showFeedback(right, item, mine);
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    pos++;
+    if (pos >= queue.length) finish();
+    else showQuestion();
+  }
+
+  /* ---------- setting the clock ---------- */
+
+  function nudge(deltaMinutes) {
+    if (mode !== 'answering' || !queue[pos] || queue[pos].q.type !== 'poner') return;
+    Kit.sfx('tap');
+    curT += deltaMinutes;
+    setHands(curT, true);
+  }
+
+  // Dragging: the minute hand follows the finger, snapped to 5 minutes. Crossing 12 moves the hour too.
+  function dragTo(e) {
+    const r = clock.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const dx = e.clientX - cx, dy = e.clientY - cy;
+    if (Math.hypot(dx, dy) < Math.min(r.width, r.height) * 0.1) return;
+    let deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    if (deg < 0) deg += 360;
+    const newM = (Math.round(deg / 30) * 5) % 60;
+    const curM = ((curT % 60) + 60) % 60;
+    let d = newM - curM;
+    if (d > 30) d -= 60;
+    if (d < -30) d += 60;
+    if (d !== 0) { curT += d; setHands(curT, false); }
+  }
+  clock.addEventListener('pointerdown', (e) => {
+    if (mode !== 'answering' || !queue[pos] || queue[pos].q.type !== 'poner') return;
+    dragging = true;
+    try { clock.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    e.preventDefault();
+    dragTo(e);
+  });
+  clock.addEventListener('pointermove', (e) => { if (dragging) dragTo(e); });
+  const endDrag = () => { dragging = false; };
+  clock.addEventListener('pointerup', endDrag);
+  clock.addEventListener('pointercancel', endDrag);
+
+  /* ---------- result ---------- */
+
+  function finish() {
+    mode = 'idle';
+    const s = load();
+    const n = Kit.stars.calc(score, ROUND);
+    const best = Object.assign({}, s.best);
+    best[level] = Math.max(best[level] || 0, n);
+    const opens = n >= 2 && level < LEVELS.length;
+    const newly = opens && !isOpen(level + 1, s);
+    store.set({ best, unlocked: Math.max(s.unlocked, opens ? level + 1 : 1) });
+
+    const extra = document.createElement('div');
+    extra.style.width = '100%';
+    const big = document.createElement('div');
+    big.setAttribute('aria-hidden', 'true');
+    big.style.fontSize = '64px';
+    big.style.lineHeight = '1';
+    big.textContent = '🕒';
+    extra.appendChild(big);
+    if (newly) {
+      const u = document.createElement('p');
+      u.className = 'unlock';
+      u.textContent = '🔓 ¡Nivel ' + (level + 1) + ' abierto!';
+      extra.appendChild(u);
+    }
+
+    const actions = [];
+    if (opens) actions.push({ label: 'Siguiente nivel', primary: true, onClick: () => startRound(level + 1) });
+    actions.push({ label: 'Elegir nivel', onClick: showStart });
+
+    Kit.result({ slug: SLUG, score, total: ROUND, extra, actions, onAgain: () => startRound(level) });
+  }
+
+  /* ---------- wiring ---------- */
+
+  $('m-minus').addEventListener('click', () => nudge(-5));
+  $('m-plus').addEventListener('click', () => nudge(5));
+  $('h-minus').addEventListener('click', () => nudge(-60));
+  $('h-plus').addEventListener('click', () => nudge(60));
+  $('check').addEventListener('click', check);
+  $('next').addEventListener('click', next);
+  $('say').addEventListener('click', () => { if (queue[pos]) Kit.speak(speechOf(queue[pos].q), 'es'); });
+  $('quit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (el.play.hidden || document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    const q = queue[pos] && queue[pos].q;
+    if (mode === 'answering' && q) {
+      if (q.type === 'leer' && /^[1-4]$/.test(e.key)) { e.preventDefault(); choose(parseInt(e.key, 10) - 1); return; }
+      if (q.type === 'poner') {
+        const step = { ArrowLeft: -5, ArrowRight: 5, ArrowDown: -60, ArrowUp: 60 }[e.key];
+        if (step) { e.preventDefault(); nudge(step); return; }
+      }
+    }
+    if (e.key === 'Enter') {
+      const a = document.activeElement;
+      if (a && a.id === 'quit') return;
+      if (mode === 'answering' && q && q.type === 'poner') { e.preventDefault(); check(); }
+      else if (mode === 'feedback') { e.preventDefault(); next(); }
+    }
+  });
+
+  buildClock();
+  Kit.mount({ slug: SLUG, title: '¿Qué hora es?' });
+  showStart();
+
+  // Hooks for the automated checks (not used by the game itself).
+  window.__reloj = { LEVELS, ROUND, timePhrase, phraseCore, digital, handAngles, makeRound, makeOptions, tOf, fromT, allowedMinutes };
+})();
+</script>
+</body>
+</html>
