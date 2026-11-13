@@ -8,6 +8,6 @@ window.KIDS_GAMES = [
   { slug: 'mini-cuentos',    title: 'Minicuentos',        emoji: '📖', color: '#EB5E9A', onAccent: '#FFFFFF', desc: 'Lee y responde',                      ready: false },
   { slug: 'robot',           title: 'Robot explorador',   emoji: '🤖', color: '#00A3B4', onAccent: '#FFFFFF', desc: 'Programa al robot',                   ready: false },
   { slug: 'spelling-bee',    title: 'Spelling Bee',       emoji: '🐝', color: '#F2C200', onAccent: '#1F2933', desc: 'Deletrea palabras en inglés',         ready: true },
-  { slug: 'word-safari',     title: 'Word Safari',        emoji: '🦁', color: '#9BBF2E', onAccent: '#1F2933', desc: 'Vocabulario en inglés',               ready: false },
+  { slug: 'word-safari',     title: 'Word Safari',        emoji: '🦁', color: '#9BBF2E', onAccent: '#1F2933', desc: 'Vocabulario en inglés',               ready: true },
   { slug: 'sentence-train',  title: 'Sentence Train',     emoji: '🚂', color: '#E0564B', onAccent: '#FFFFFF', desc: 'Construye frases en inglés',          ready: false }
 ];

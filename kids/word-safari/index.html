@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Word Safari: vocabulario en inglés para escuchar, leer y traducir.">
+<meta name="theme-color" content="#fff8ec">
+<title>Word Safari</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .menu { display: flex; flex-direction: column; gap: 8px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0 0 4px; text-align: center; color: var(--muted); font-weight: 700; }
+  .novoice { padding: 8px 12px; border-radius: 14px; background: #fff3cd; border: 2px solid #f2c200; font-size: 20px; font-weight: 700; }
+  .themes { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 0; padding: 0; list-style: none; }
+  @media (min-width: 640px) { .themes { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1000px) { .themes { grid-template-columns: repeat(3, 1fr); } }
+  .theme { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 3px solid var(--accent); border-radius: var(--radius);
+           background: var(--card); box-shadow: 0 4px 0 var(--accent); }
+  .theme__head { display: flex; align-items: center; gap: 12px; }
+  .theme__emoji { flex: none; font-size: 40px; line-height: 1; }
+  .theme__t { flex: 1; min-width: 0; }
+  .theme__name { font-size: 24px; font-weight: 900; line-height: 1.1; }
+  .theme__mast { font-size: 20px; font-weight: 800; color: var(--muted); }
+  .bar { height: 12px; border-radius: 6px; background: #eadfca; overflow: hidden; margin-top: 4px; }
+  .bar > i { display: block; height: 100%; background: var(--ok); border-radius: 6px; }
+  .theme__btns { display: flex; gap: 8px; }
+  .theme__btns .k-btn { flex: 1; padding: 0 12px; font-size: 22px; }
+
+  .play, .learn { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .top { display: flex; align-items: center; gap: 10px; }
+  .top .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .top .k-progress { flex: 1; gap: 6px; flex-wrap: nowrap; }
+  .top .k-progress > i { width: 16px; height: 16px; border-width: 3px; flex: none; }
+  .top .ttl { flex: 1; text-align: center; font-size: 22px; font-weight: 900; }
+
+  /* pictures: emoji, painted swatch or numeral */
+  .pic { display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-size: var(--ps, 48px); min-width: var(--ps, 48px); }
+  .pic.swatch { width: var(--ps); height: var(--ps); min-width: 0; border-radius: 50%; border: 3px solid rgba(31, 41, 51, .35); }
+  .pic.numeral { font-weight: 900; font-size: calc(var(--ps) * .9); color: var(--ink); }
+
+  .q-card { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 132px; padding: 8px 12px; }
+  .q-row { display: flex; align-items: center; gap: 12px; }
+  .q-row .pic { --ps: 64px; flex: none; }
+  .q-txt { flex: 1; min-width: 0; font-size: 22px; font-weight: 800; color: var(--muted); line-height: 1.15; }
+  .q-txt.is-word { color: var(--ink); font-size: 36px; font-weight: 900; line-height: 1.1; }
+  .q-txt .sub { display: block; font-size: 20px; font-weight: 700; color: var(--muted); }
+  .big-say { flex: none; width: 72px; height: 72px; border-radius: 50%; border: 3px solid var(--accent); background: var(--accent); color: var(--on-accent);
+             font-size: 34px; cursor: pointer; touch-action: manipulation; box-shadow: 0 4px 0 rgba(0,0,0,.18); }
+  .big-say:active { transform: translateY(2px); }
+  .fbt { font-size: 24px; font-weight: 900; }
+  .fbt.is-ok { color: var(--ok); }
+  .fbt.is-ko { color: var(--ko); }
+  .rv-en { font-size: 34px; font-weight: 900; line-height: 1.05; color: var(--ink); }
+  .rv-es { font-size: 22px; font-weight: 800; color: var(--muted); }
+
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .opts .k-choice { min-height: 72px; padding: 6px 8px; font-size: 28px; line-height: 1.05; text-align: center; overflow-wrap: normal; }
+  .opts.is-pics .k-choice { min-height: 84px; }
+  .opts .k-choice .pic { --ps: 48px; }
+  .opts .k-choice:disabled { cursor: default; }
+  .opts .k-choice:disabled:not(.is-ok):not(.is-ko) { opacity: .55; }
+  .dock { min-height: 64px; display: flex; }
+  .dock .k-btn { width: 100%; }
+
+  /* flashcards */
+  .flash { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+           width: 100%; padding: 12px; border: 3px solid var(--accent); border-radius: var(--radius); background: var(--card);
+           box-shadow: 0 4px 0 var(--accent); color: var(--ink); cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+  .flash:active { transform: translateY(2px); }
+  .flash .pic { --ps: 112px; }
+  .flash__en { font-size: clamp(36px, 11vw, 56px); font-weight: 900; line-height: 1.05; }
+  .flash__es { font-size: 26px; font-weight: 800; color: var(--muted); }
+  .flash__tap { font-size: 20px; font-weight: 700; color: var(--muted); }
+  .nav { display: flex; align-items: center; gap: 8px; }
+  .nav .k-btn { min-width: 64px; padding: 0 16px; font-size: 30px; }
+  .nav .count { flex: 1; text-align: center; font-size: 22px; font-weight: 800; color: var(--muted); }
+  .learn-go { width: 100%; }
+  @media (max-height: 700px) { .flash .pic { --ps: 88px; } .flash { gap: 2px; } }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir tema">
+    <div class="menu">
+      <h2>¡Elige un tema!</h2>
+      <p>Aprende las palabras y luego juega.</p>
+      <p class="novoice" id="novoice" hidden>Aviso para adultos: este dispositivo no tiene voz en inglés, así que no habrá audio y no habrá preguntas de escuchar.</p>
+      <ul class="themes" id="themes"></ul>
+    </div>
+  </main>
+
+  <main class="k-screen learn" id="learn" hidden aria-label="Aprender">
+    <div class="top">
+      <button type="button" class="k-btn k-btn--ghost" id="learn-quit" aria-label="Volver a los temas">‹ Temas</button>
+      <div class="ttl" id="learn-title"></div>
+    </div>
+    <button type="button" class="flash" id="flash" aria-label="Escuchar la palabra"></button>
+    <div class="nav">
+      <button type="button" class="k-btn k-btn--ghost" id="prev" aria-label="Palabra anterior">‹</button>
+      <div class="count" id="count" aria-live="polite"></div>
+      <button type="button" class="k-btn k-btn--ghost" id="nextcard" aria-label="Palabra siguiente">›</button>
+    </div>
+    <button type="button" class="k-btn k-btn--big learn-go" id="learn-go">Jugar</button>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="top">
+      <button type="button" class="k-btn k-btn--ghost" id="quit" aria-label="Volver a los temas">‹ Temas</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+    <div class="k-card q-card" id="qcard" role="status" aria-live="polite"></div>
+    <div class="opts" id="opts"></div>
+    <div class="dock"><button type="button" class="k-btn k-btn--big" id="next" style="visibility:hidden">Siguiente</button></div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: themes and words (edit here) =====
+     Each word: [English, Spanish, picture, optional 'fuzzy'].
+     picture is an emoji, 'sw:#rrggbb' (painted swatch) or 'num:7' (large numeral).
+     'fuzzy' marks a word whose emoji is only approximate: it is only ever asked as Spanish -> English. */
+  const SLUG = 'word-safari';
+  const ROUND = 10;
+  const THEMES = [
+    { id: 'colours', name: 'Colores', emoji: '🎨', words: [
+      ['red', 'rojo', 'sw:#e53935'], ['blue', 'azul', 'sw:#1e63d6'], ['yellow', 'amarillo', 'sw:#fdd835'], ['green', 'verde', 'sw:#2e9e5b'],
+      ['orange', 'naranja', 'sw:#fb8c00'], ['purple', 'morado', 'sw:#8e44ad'], ['pink', 'rosa', 'sw:#f48fb1'], ['brown', 'marrón', 'sw:#8d5a2b'],
+      ['black', 'negro', 'sw:#1f2933'], ['white', 'blanco', 'sw:#ffffff'], ['grey', 'gris', 'sw:#9aa5b1'], ['gold', 'dorado', 'sw:#c9971c'] ] },
+    { id: 'numbers', name: 'Números', emoji: '🔢', words: [
+      ['one', 'uno', 'num:1'], ['two', 'dos', 'num:2'], ['three', 'tres', 'num:3'], ['four', 'cuatro', 'num:4'], ['five', 'cinco', 'num:5'],
+      ['six', 'seis', 'num:6'], ['seven', 'siete', 'num:7'], ['eight', 'ocho', 'num:8'], ['nine', 'nueve', 'num:9'], ['ten', 'diez', 'num:10'],
+      ['eleven', 'once', 'num:11'], ['twelve', 'doce', 'num:12'] ] },
+    { id: 'animals', name: 'Animales', emoji: '🦁', words: [
+      ['dog', 'perro', '🐶'], ['cat', 'gato', '🐱'], ['bird', 'pájaro', '🐦'], ['fish', 'pez', '🐟'], ['horse', 'caballo', '🐴'], ['cow', 'vaca', '🐮'],
+      ['pig', 'cerdo', '🐷'], ['sheep', 'oveja', '🐑'], ['rabbit', 'conejo', '🐰'], ['duck', 'pato', '🦆'], ['lion', 'león', '🦁'], ['elephant', 'elefante', '🐘'] ] },
+    { id: 'food', name: 'Comida', emoji: '🍎', words: [
+      ['apple', 'manzana', '🍎'], ['banana', 'plátano', '🍌'], ['bread', 'pan', '🍞'], ['cheese', 'queso', '🧀'], ['milk', 'leche', '🥛'], ['egg', 'huevo', '🥚'],
+      ['pizza', 'pizza', '🍕'], ['cake', 'tarta', '🎂'], ['grapes', 'uvas', '🍇'], ['carrot', 'zanahoria', '🥕'], ['tomato', 'tomate', '🍅'], ['pear', 'pera', '🍐'] ] },
+    { id: 'family', name: 'Familia', emoji: '👪', words: [
+      ['mother', 'madre', '👩'], ['father', 'padre', '👨'], ['sister', 'hermana', '👧'], ['brother', 'hermano', '👦'], ['baby', 'bebé', '👶'],
+      ['grandma', 'abuela', '👵'], ['grandpa', 'abuelo', '👴'], ['family', 'familia', '👪'], ['friend', 'amigo', '👫'],
+      ['aunt', 'tía', '👩‍🦰', 'fuzzy'], ['uncle', 'tío', '👨‍🦰', 'fuzzy'], ['cousin', 'primo', '🧑', 'fuzzy'] ] },
+    { id: 'body', name: 'El cuerpo', emoji: '🖐️', words: [
+      ['hand', 'mano', '✋'], ['foot', 'pie', '🦶'], ['eye', 'ojo', '👁️'], ['ear', 'oreja', '👂'], ['nose', 'nariz', '👃'], ['mouth', 'boca', '👄'],
+      ['tooth', 'diente', '🦷'], ['leg', 'pierna', '🦵'], ['arm', 'brazo', '💪'], ['tongue', 'lengua', '👅'], ['heart', 'corazón', '❤️'], ['brain', 'cerebro', '🧠'] ] },
+    { id: 'clothes', name: 'La ropa', emoji: '👕', words: [
+      ['shirt', 'camiseta', '👕'], ['trousers', 'pantalones', '👖'], ['dress', 'vestido', '👗'], ['shoes', 'zapatos', '👟'], ['socks', 'calcetines', '🧦'],
+      ['hat', 'sombrero', '👒'], ['coat', 'abrigo', '🧥'], ['scarf', 'bufanda', '🧣'], ['gloves', 'guantes', '🧤'], ['shorts', 'pantalones cortos', '🩳'],
+      ['boots', 'botas', '🥾'], ['glasses', 'gafas', '👓'] ] },
+    { id: 'school', name: 'El cole', emoji: '🎒', words: [
+      ['book', 'libro', '📖'], ['pencil', 'lápiz', '✏️'], ['pen', 'bolígrafo', '🖊️'], ['bag', 'mochila', '🎒'], ['ruler', 'regla', '📏'], ['scissors', 'tijeras', '✂️'],
+      ['school', 'colegio', '🏫'], ['teacher', 'profesor', '🧑‍🏫'], ['computer', 'ordenador', '💻'], ['notebook', 'cuaderno', '📓'], ['chair', 'silla', '🪑'], ['paint', 'pintura', '🎨'] ] },
+    { id: 'house', name: 'La casa', emoji: '🏠', words: [
+      ['house', 'casa', '🏠'], ['door', 'puerta', '🚪'], ['window', 'ventana', '🪟'], ['bed', 'cama', '🛏️'], ['sofa', 'sofá', '🛋️'], ['bath', 'bañera', '🛁'],
+      ['toilet', 'váter', '🚽'], ['shower', 'ducha', '🚿'], ['key', 'llave', '🔑'], ['light', 'luz', '💡'], ['radio', 'radio', '📻'], ['clock', 'reloj', '🕰️'] ] },
+    { id: 'weather', name: 'El tiempo', emoji: '⛅', words: [
+      ['sun', 'sol', '☀️'], ['rain', 'lluvia', '🌧️'], ['snow', 'nieve', '❄️'], ['wind', 'viento', '💨'], ['cloud', 'nube', '☁️'], ['storm', 'tormenta', '⛈️'],
+      ['rainbow', 'arcoíris', '🌈'], ['fog', 'niebla', '🌫️'], ['lightning', 'rayo', '⚡'], ['hot', 'calor', '🥵'], ['cold', 'frío', '🥶'], ['umbrella', 'paraguas', '☔'] ] },
+    { id: 'actions', name: 'Acciones', emoji: '🏃', words: [
+      ['run', 'correr', '🏃'], ['jump', 'saltar', '🤸'], ['swim', 'nadar', '🏊'], ['walk', 'andar', '🚶'], ['sleep', 'dormir', '😴'], ['eat', 'comer', '🍴'],
+      ['drink', 'beber', '🥤'], ['sing', 'cantar', '🎤'], ['dance', 'bailar', '💃'], ['cry', 'llorar', '😢'], ['laugh', 'reír', '😂'], ['climb', 'trepar', '🧗'] ] },
+    { id: 'toys', name: 'Juguetes', emoji: '🧸', words: [
+      ['ball', 'pelota', '⚽'], ['teddy bear', 'osito de peluche', '🧸'], ['doll', 'muñeca', '🪆'], ['kite', 'cometa', '🪁'], ['robot', 'robot', '🤖'], ['puzzle', 'puzle', '🧩'],
+      ['balloon', 'globo', '🎈'], ['drum', 'tambor', '🥁'], ['train', 'tren', '🚂'], ['car', 'coche', '🚗'], ['bike', 'bicicleta', '🚲'], ['game', 'videojuego', '🎮'] ] }
+  ];
+  /* ===== end DATA ===== */
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- words ---------- */
+
+  const WORDS = [];
+  const BY_ID = {};
+  THEMES.forEach((t) => {
+    t.words = t.words.map((r) => {
+      const w = { id: r[0], en: r[0], es: r[1], pic: r[2], fuzzy: r[3] === 'fuzzy', theme: t.id };
+      WORDS.push(w); BY_ID[w.id] = w;
+      return w;
+    });
+  });
+  const themeOf = (id) => THEMES.find((t) => t.id === id);
+
+  function picEl(w) {
+    const s = document.createElement('span');
+    s.className = 'pic';
+    s.setAttribute('aria-hidden', 'true');
+    if (w.pic.indexOf('sw:') === 0) { s.classList.add('swatch'); s.style.background = w.pic.slice(3); }
+    else if (w.pic.indexOf('num:') === 0) { s.classList.add('numeral'); s.textContent = w.pic.slice(4); }
+    else s.textContent = w.pic;
+    return s;
+  }
+
+  /* ---------- question logic ---------- */
+
+  // Question kind follows the deck box (unseen counts as box 1). A word with an approximate emoji is only asked from Spanish.
+  function kindFor(box, speaks, w) {
+    if (w && w.fuzzy) return 'traducir';
+    if (box >= 3) return 'traducir';
+    if (box === 2) return 'leer';
+    return speaks ? 'escuchar' : 'leer';
+  }
+  // Four different options from the same theme, always including the right one.
+  function buildOptions(w, kind) {
+    const pool = themeOf(w.theme).words.filter((x) => x.id !== w.id && (kind !== 'escuchar' || !x.fuzzy));
+    return Kit.shuffle([w].concat(Kit.sample(pool, 3)));
+  }
+
+  /* ---------- state ---------- */
+
+  const store = Kit.store(SLUG);
+  const decks = {};
+  THEMES.forEach((t) => { decks[t.id] = Kit.deck(SLUG, t.words.map((w) => w.id)); });
+  const boxOf = (id) => { const b = store.get({ deck: {} }).deck || {}; return Number(b[id]) || 1; };
+
+  let theme = null, queue = [], pos = 0, score = 0, results = [], opts = [], mode = 'idle', voiceOn = true;
+  let cardPos = 0;
+  const el = { start: $('start'), learn: $('learn'), play: $('play'), qcard: $('qcard'), opts: $('opts'), next: $('next'), dots: $('dots') };
+
+  function show(which) {
+    el.start.hidden = which !== 'start';
+    el.learn.hidden = which !== 'learn';
+    el.play.hidden = which !== 'play';
+  }
+
+  /* ---------- start screen ---------- */
+
+  function showStart() {
+    mode = 'idle';
+    show('start');
+    $('novoice').hidden = Kit.canSpeak('en');
+    const ul = $('themes');
+    ul.textContent = '';
+    THEMES.forEach((t) => {
+      const st = decks[t.id].stats();
+      const li = document.createElement('li');
+      li.className = 'theme';
+      li.innerHTML = '<div class="theme__head"><span class="theme__emoji" aria-hidden="true"></span><div class="theme__t"><div class="theme__name"></div>' +
+        '<div class="theme__mast"></div><div class="bar" aria-hidden="true"><i></i></div></div></div>' +
+        '<div class="theme__btns"><button type="button" class="k-btn k-btn--ghost" data-a="learn">Aprender</button><button type="button" class="k-btn" data-a="play">Jugar</button></div>';
+      li.querySelector('.theme__emoji').textContent = t.emoji;
+      li.querySelector('.theme__name').textContent = t.name;
+      li.querySelector('.theme__mast').textContent = st.mastered + ' de ' + st.total + ' dominadas';
+      li.querySelector('.bar > i').style.width = Math.round(100 * st.mastered / st.total) + '%';
+      li.querySelector('[data-a="learn"]').setAttribute('aria-label', 'Aprender: ' + t.name);
+      li.querySelector('[data-a="play"]').setAttribute('aria-label', 'Jugar: ' + t.name);
+      li.querySelector('[data-a="learn"]').addEventListener('click', () => { Kit.sfx('tap'); startLearn(t.id); });
+      li.querySelector('[data-a="play"]').addEventListener('click', () => { Kit.sfx('tap'); startRound(t.id); });
+      ul.appendChild(li);
+    });
+  }
+
+  /* ---------- Aprender (flashcards) ---------- */
+
+  function startLearn(id) {
+    theme = themeOf(id);
+    cardPos = 0;
+    voiceOn = Kit.canSpeak('en');
+    $('learn-title').textContent = theme.emoji + ' ' + theme.name;
+    show('learn');
+    renderCard(true);
+  }
+
+  function renderCard(speak) {
+    const w = theme.words[cardPos];
+    const f = $('flash');
+    f.textContent = '';
+    f.appendChild(picEl(w));
+    const en = document.createElement('div'); en.className = 'flash__en'; en.lang = 'en'; en.textContent = w.en;
+    const es = document.createElement('div'); es.className = 'flash__es'; es.textContent = w.es;
+    f.appendChild(en); f.appendChild(es);
+    if (voiceOn) { const tap = document.createElement('div'); tap.className = 'flash__tap'; tap.textContent = '🔊 Toca para escuchar'; f.appendChild(tap); }
+    $('count').textContent = (cardPos + 1) + ' de ' + theme.words.length;
+    $('prev').disabled = cardPos === 0;
+    $('nextcard').disabled = cardPos === theme.words.length - 1;
+    if (speak && voiceOn) Kit.speak(w.en, 'en');
+  }
+  function moveCard(d) {
+    const n = cardPos + d;
+    if (n < 0 || n >= theme.words.length) return;
+    Kit.sfx('tap');
+    cardPos = n;
+    renderCard(true);
+  }
+
+  /* ---------- Jugar ---------- */
+
+  function startRound(id) {
+    theme = themeOf(id);
+    voiceOn = Kit.canSpeak('en');
+    queue = decks[id].next(ROUND).map((wid, i) => {
+      const w = BY_ID[wid];
+      return { w, kind: kindFor(boxOf(wid), voiceOn, w), orig: i, rep: false };
+    });
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    show('play');
+    showQuestion();
+  }
+
+  function renderDots() {
+    el.dots.textContent = '';
+    const it = queue[pos];
+    results.forEach((r, i) => {
+      const d = document.createElement('i');
+      if (r === true) d.className = 'is-done';
+      else if (r === false) d.className = 'is-miss';
+      if (it && !it.rep && it.orig === i) d.classList.add('is-current');
+      el.dots.appendChild(d);
+    });
+  }
+
+  function qtext(main, cls, sub) {
+    const d = document.createElement('div');
+    d.className = 'q-txt' + (cls ? ' ' + cls : '');
+    d.textContent = main;
+    if (sub) { const s = document.createElement('span'); s.className = 'sub'; s.textContent = sub; d.appendChild(s); }
+    return d;
+  }
+
+  function showQuestion() {
+    mode = 'answering';
+    renderDots();
+    const it = queue[pos], w = it.w;
+    opts = buildOptions(w, it.kind);
+    const card = el.qcard;
+    card.textContent = '';
+    const row = document.createElement('div');
+    row.className = 'q-row';
+    if (it.kind === 'escuchar') {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'big-say'; b.id = 'say'; b.textContent = '🔊';
+      b.setAttribute('aria-label', 'Escuchar la palabra');
+      b.addEventListener('click', () => Kit.speak(w.en, 'en'));
+      row.appendChild(b);
+      row.appendChild(qtext('Escucha y toca la imagen.'));
+    } else if (it.kind === 'leer') {
+      row.appendChild(picEl(w));
+      row.appendChild(qtext('¿Cómo se dice en inglés?'));
+    } else {
+      row.appendChild(qtext(w.es, 'is-word', 'Toca la palabra en inglés.'));
+    }
+    card.appendChild(row);
+    card.dataset.kind = it.kind;
+
+    const pics = it.kind === 'escuchar';
+    el.opts.textContent = '';
+    el.opts.classList.toggle('is-pics', pics);
+    opts.forEach((o, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'k-choice';
+      b.dataset.id = o.id;
+      if (pics) { b.appendChild(picEl(o)); b.setAttribute('aria-label', o.es); }
+      else { b.lang = 'en'; b.textContent = o.en; }
+      b.addEventListener('click', () => choose(i));
+      el.opts.appendChild(b);
+    });
+    el.next.style.visibility = 'hidden';
+    if (it.kind === 'escuchar') Kit.speak(w.en, 'en');
+  }
+
+  function choose(i) {
+    if (mode !== 'answering') return;
+    const it = queue[pos], w = it.w;
+    const right = opts[i].id === w.id;
+    mode = 'feedback';
+    [...el.opts.children].forEach((b, k) => {
+      b.disabled = true;
+      if (opts[k].id === w.id) b.classList.add('is-ok');
+      else if (k === i) b.classList.add('is-ko');
+    });
+    if (right) Kit.sfx('ok'); else Kit.sfx('ko');
+    if (!it.rep) {
+      decks[theme.id].mark(w.id, right);
+      if (right) { score++; results[it.orig] = true; }
+      else {
+        results[it.orig] = false;
+        const at = Math.min(queue.length, pos + 1 + Kit.randInt(2, 4));
+        queue.splice(at, 0, { w, kind: it.kind, orig: it.orig, rep: true });
+      }
+    }
+    renderDots();
+
+    const card = el.qcard;
+    card.textContent = '';
+    const t = document.createElement('div');
+    t.className = 'fbt ' + (right ? 'is-ok' : 'is-ko');
+    t.textContent = right ? '✓ ' + Kit.praise() : '✗ ' + Kit.encourage();
+    const row = document.createElement('div');
+    row.className = 'q-row';
+    row.appendChild(picEl(w));
+    const txt = document.createElement('div');
+    txt.className = 'q-txt';
+    const en = document.createElement('div'); en.className = 'rv-en'; en.lang = 'en'; en.textContent = w.en;
+    const es = document.createElement('div'); es.className = 'rv-es'; es.textContent = w.es;
+    txt.appendChild(en); txt.appendChild(es);
+    row.appendChild(txt);
+    if (voiceOn) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'say-small big-say'; b.textContent = '🔊';
+      b.style.width = b.style.height = '56px'; b.style.fontSize = '26px';
+      b.setAttribute('aria-label', 'Escuchar la palabra');
+      b.addEventListener('click', () => Kit.speak(w.en, 'en'));
+      row.appendChild(b);
+    }
+    card.appendChild(t); card.appendChild(row);
+    Kit.speak(w.en, 'en');
+    el.next.style.visibility = 'visible';
+    el.next.focus({ preventScroll: true });
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    pos++;
+    if (pos >= queue.length) finish(); else showQuestion();
+  }
+
+  function finish() {
+    mode = 'idle';
+    const id = theme.id;
+    const mast = decks[id].stats();
+    const extra = document.createElement('div');
+    extra.style.fontSize = '44px';
+    extra.setAttribute('aria-hidden', 'true');
+    extra.textContent = theme.emoji;
+    Kit.result({ slug: SLUG, score, total: ROUND, extra, onAgain: () => startRound(id),
+      message: mast.mastered === mast.total ? '¡Dominas todo el tema!' : undefined,
+      actions: [{ label: 'Elegir tema', onClick: showStart }] });
+  }
+
+  /* ---------- wiring ---------- */
+
+  $('flash').addEventListener('click', () => { if (voiceOn) Kit.speak(theme.words[cardPos].en, 'en'); Kit.sfx('tap'); });
+  $('prev').addEventListener('click', () => moveCard(-1));
+  $('nextcard').addEventListener('click', () => moveCard(1));
+  $('learn-go').addEventListener('click', () => { Kit.sfx('tap'); startRound(theme.id); });
+  $('learn-quit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+  $('quit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+  el.next.addEventListener('click', next);
+
+  document.addEventListener('keydown', (e) => {
+    if (document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!el.learn.hidden) {
+      if (e.key === 'ArrowRight') { e.preventDefault(); moveCard(1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); moveCard(-1); }
+      return;
+    }
+    if (el.play.hidden) return;
+    if (/^[1-4]$/.test(e.key) && mode === 'answering') { e.preventDefault(); choose(Number(e.key) - 1); }
+    else if (e.key === 'Enter' && mode === 'feedback') {
+      if (document.activeElement && document.activeElement.id === 'quit') return;
+      e.preventDefault(); next();
+    }
+  });
+
+  Kit.mount({ slug: SLUG, title: 'Word Safari' });
+  Kit.ready.then(showStart);
+
+  // Hooks for the automated checks (not used by the game itself).
+  window.__safari = { THEMES, WORDS, ROUND, kindFor, buildOptions, boxOf, decks, get state() { return { theme: theme && theme.id, pos, mode, score, queue: queue.map((q) => q.w.id + ':' + q.kind + (q.rep ? '*' : '')) }; } };
+})();
+</script>
+</body>
+</html>
