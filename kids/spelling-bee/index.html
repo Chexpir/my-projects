@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Spelling Bee: deletrea palabras en inglés.">
+<meta name="theme-color" content="#fff8ec">
+<title>Spelling Bee</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .menu { display: flex; flex-direction: column; gap: 8px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0 0 4px; text-align: center; color: var(--muted); font-weight: 700; }
+  .lvl {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 8px 14px;
+    text-align: left; border: 3px solid var(--accent); border-radius: var(--radius);
+    background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--accent); cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  }
+  .lvl:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lvl__n { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+            display: grid; place-items: center; font-size: 24px; font-weight: 900; }
+  .lvl__t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .lvl__name { font-size: 22px; font-weight: 900; line-height: 1.15; }
+  .lvl__sub { font-size: 20px; font-weight: 600; color: var(--muted); line-height: 1.2; }
+  .lvl__side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 20px; font-weight: 800; }
+  .lvl__side .k-stars { font-size: 24px; }
+  .novoice { margin: 0; padding: 8px 12px; border-radius: 14px; background: #fff3cd; border: 2px solid #f2c200; font-size: 20px; font-weight: 700; text-align: center; }
+
+  .play { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .play-top { display: flex; align-items: center; gap: 10px; }
+  .play-top .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .play-top .k-progress { flex: 1; gap: 6px; flex-wrap: nowrap; }
+  .play-top .k-progress > i { width: 16px; height: 16px; border-width: 3px; flex: none; }
+
+  .prompt { display: flex; align-items: center; gap: 12px; padding: 8px 12px; min-height: 84px; }
+  .pic { flex: none; min-width: 64px; text-align: center; font-size: 52px; line-height: 1; font-weight: 900; }
+  .pic.is-num { font-size: 44px; color: var(--ink); }
+  .es { flex: 1; min-width: 0; font-size: 24px; font-weight: 800; color: var(--muted); line-height: 1.15; overflow-wrap: anywhere; }
+  .es.is-big { font-size: 40px; color: var(--ink); }
+  .listen { flex: none; display: flex; gap: 8px; }
+  .say { min-width: 56px; min-height: 56px; border-radius: 50%; border: 2px solid var(--line); background: var(--card);
+         font-size: 26px; cursor: pointer; touch-action: manipulation; }
+  .say:active { transform: translateY(2px); }
+
+  .msg { min-height: 28px; text-align: center; font-size: 22px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+
+  .ans { display: flex; justify-content: center; gap: 6px; }
+  .slot {
+    flex: 1 1 0; min-width: 0; max-width: 52px; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 12px; border: 3px solid var(--line); background: #fff; font-size: 32px; font-weight: 900; line-height: 1;
+    -webkit-user-select: none; user-select: none;
+  }
+  .ans.dense .slot, .reveal.dense .slot { font-size: 24px; border-width: 2px; }
+  .slot.is-cur { border-color: var(--accent); }
+  .slot.is-ok { border-color: var(--ok); background: var(--ok-bg); color: var(--ok); }
+  .slot.is-ko { border-color: var(--ko); background: var(--ko-bg); color: var(--ko); }
+  .slot.is-ok::after { content: "\2713"; font-size: 16px; }
+  .slot.is-ko::after { content: "\2717"; font-size: 16px; }
+  .slot.is-say { transform: translateY(-4px); box-shadow: 0 4px 0 var(--ok); }
+
+  .dock { display: block; }
+  .tray { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 8px; }
+  .tray .k-tile { width: 56px; height: 56px; padding: 0; font-size: 30px; }
+  .kb { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .kb-row { display: flex; justify-content: center; gap: 4px; }
+  .kb-key {
+    flex: 0 1 calc((100% - 36px) / 10); max-width: 64px; min-width: 0; height: 56px; padding: 0;
+    border: 3px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink);
+    font-size: 26px; font-weight: 800; cursor: pointer; box-shadow: 0 3px 0 var(--line);
+    touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  }
+  .kb-key:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+  .acts { display: flex; gap: 8px; }
+  .acts .k-btn { min-height: 56px; }
+  #del { flex: none; padding: 0 18px; font-size: 20px; }
+  #go { flex: 1; font-size: 24px; }
+
+  .fb { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+  .fb__title { font-size: 28px; font-weight: 900; }
+  .fb__title.is-ok { color: var(--ok); }
+  .fb__title.is-ko { color: var(--ko); }
+  .fb__note { font-size: 20px; font-weight: 700; color: var(--muted); }
+  .reveal { display: flex; justify-content: center; gap: 6px; width: 100%; }
+  .reveal .slot { height: 56px; font-size: 32px; border-color: var(--ok); background: var(--ok-bg); color: var(--ok); }
+  .reveal .slot::after { content: none; }
+  .bee { font-size: 40px; }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir nivel">
+    <div class="menu">
+      <h2>¡Elige tu nivel!</h2>
+      <p>Escucha la palabra y escríbela en inglés.</p>
+      <div id="levels" class="menu"></div>
+      <p class="novoice" id="novoice" hidden>Aviso para adultos: este dispositivo no tiene voz en inglés. Verás la palabra en español y no habrá audio.</p>
+    </div>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="play-top">
+      <button type="button" class="k-btn k-btn--ghost" id="quit" aria-label="Volver a los niveles">‹ Niveles</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+    <div class="k-card prompt" id="prompt">
+      <div class="pic" id="pic" aria-hidden="true"></div>
+      <div class="es" id="es"></div>
+      <div class="listen" id="listen">
+        <button type="button" class="say" id="say" aria-label="Escuchar la palabra">🔊</button>
+        <button type="button" class="say" id="slow" aria-label="Escuchar despacio">🐢</button>
+      </div>
+    </div>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+    <div class="ans" id="ans" role="img"></div>
+    <div class="dock">
+      <div id="input">
+        <div class="tray" id="tray"></div>
+        <div class="kb" id="kb"></div>
+        <div class="acts">
+          <button type="button" class="k-btn k-btn--ghost" id="del" aria-label="Borrar la última letra">⌫ borrar</button>
+          <button type="button" class="k-btn" id="go">Comprobar</button>
+        </div>
+      </div>
+      <div class="fb" id="fb" hidden role="status" aria-live="polite">
+        <div class="fb__title" id="fb-title"></div>
+        <div class="reveal" id="reveal" lang="en"></div>
+        <div class="fb__note" id="fb-note"></div>
+        <button type="button" class="k-btn k-btn--big" id="next">Siguiente</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: words (edit here) =====
+     [word, picture, Spanish meaning]. The picture is an emoji (or a numeral for numbers).
+     British spelling. Level 1: 3-4 letters. Level 2: 4-5 letters. Level 3: school words, days, numbers. */
+  const SLUG = 'spelling-bee';
+  const ROUND = 8;
+  const EXTRA_TILES = 3;
+  const LEVELS = [
+    { n: 1, name: 'Letras justas',      sub: 'Ordena las letras' },
+    { n: 2, name: 'Letras de más',      sub: 'Elige las letras buenas' },
+    { n: 3, name: 'Teclado',            sub: 'Escribe sin pistas' }
+  ];
+  const DATA = {
+    1: [
+      ['cat', '🐱', 'gato'], ['dog', '🐶', 'perro'], ['sun', '☀️', 'sol'], ['hat', '👒', 'sombrero'], ['bed', '🛏️', 'cama'],
+      ['pig', '🐷', 'cerdo'], ['red', '🔴', 'rojo'], ['bus', '🚌', 'autobús'], ['pen', '🖊️', 'bolígrafo'], ['box', '📦', 'caja'],
+      ['cup', '☕', 'taza'], ['egg', '🥚', 'huevo'], ['fox', '🦊', 'zorro'], ['bat', '🦇', 'murciélago'], ['ant', '🐜', 'hormiga'],
+      ['owl', '🦉', 'búho'], ['cow', '🐮', 'vaca'], ['hen', '🐔', 'gallina'], ['rat', '🐀', 'rata'], ['map', '🗺️', 'mapa'],
+      ['car', '🚗', 'coche'], ['bag', '🎒', 'mochila'], ['web', '🕸️', 'telaraña'], ['leg', '🦵', 'pierna'], ['arm', '💪', 'brazo'],
+      ['bell', '🔔', 'campana'], ['crab', '🦀', 'cangrejo'], ['lion', '🦁', 'león'], ['hand', '✋', 'mano'], ['nose', '👃', 'nariz'],
+      ['cake', '🎂', 'tarta'], ['kite', '🪁', 'cometa'], ['gift', '🎁', 'regalo'], ['ring', '💍', 'anillo'], ['bike', '🚲', 'bicicleta'],
+      ['ball', '⚽', 'pelota'], ['tent', '⛺', 'tienda de campaña'], ['drum', '🥁', 'tambor'], ['flag', '🚩', 'bandera'], ['bird', '🐦', 'pájaro']
+    ],
+    2: [
+      ['fish', '🐟', 'pez'], ['ship', '🚢', 'barco'], ['duck', '🦆', 'pato'], ['book', '📖', 'libro'], ['moon', '🌙', 'luna'],
+      ['tree', '🌳', 'árbol'], ['frog', '🐸', 'rana'], ['star', '⭐', 'estrella'], ['milk', '🥛', 'leche'], ['blue', '🔵', 'azul'],
+      ['chair', '🪑', 'silla'], ['chick', '🐤', 'pollito'], ['shell', '🐚', 'concha'], ['sheep', '🐑', 'oveja'], ['clock', '🕒', 'reloj'],
+      ['sock', '🧦', 'calcetín'], ['rock', '🪨', 'roca'], ['black', '⚫', 'negro'], ['truck', '🚚', 'camión'], ['brick', '🧱', 'ladrillo'],
+      ['foot', '🦶', 'pie'], ['boot', '🥾', 'bota'], ['spoon', '🥄', 'cuchara'], ['broom', '🧹', 'escoba'], ['tooth', '🦷', 'diente'],
+      ['deer', '🦌', 'ciervo'], ['green', '🟢', 'verde'], ['queen', '👸', 'reina'], ['sleep', '😴', 'dormir'], ['shoe', '👟', 'zapato'],
+      ['shirt', '👕', 'camiseta'], ['shark', '🦈', 'tiburón'], ['peach', '🍑', 'melocotón'], ['cook', '🧑‍🍳', 'cocinero'], ['wood', '🪵', 'madera'],
+      ['bear', '🐻', 'oso'], ['pear', '🍐', 'pera'], ['horse', '🐴', 'caballo'], ['snake', '🐍', 'serpiente'], ['mouse', '🐭', 'ratón']
+    ],
+    3: [
+      ['school', '🏫', 'colegio'], ['friend', '👫', 'amigo'], ['house', '🏠', 'casa'], ['water', '💧', 'agua'], ['apple', '🍎', 'manzana'],
+      ['yellow', '🟡', 'amarillo'], ['purple', '🟣', 'morado'], ['monkey', '🐒', 'mono'], ['mother', '👩', 'madre'], ['sister', '👧', 'hermana'],
+      ['teacher', '🧑‍🏫', 'profesor'], ['pencil', '✏️', 'lápiz'], ['elephant', '🐘', 'elefante'],
+      ['Monday', '📅', 'lunes'], ['Tuesday', '📅', 'martes'], ['Wednesday', '📅', 'miércoles'], ['Thursday', '📅', 'jueves'],
+      ['Friday', '📅', 'viernes'], ['Saturday', '📅', 'sábado'], ['Sunday', '📅', 'domingo'],
+      ['one', '1', 'uno'], ['two', '2', 'dos'], ['three', '3', 'tres'], ['four', '4', 'cuatro'], ['five', '5', 'cinco'],
+      ['six', '6', 'seis'], ['seven', '7', 'siete'], ['eight', '8', 'ocho'], ['nine', '9', 'nueve'], ['ten', '10', 'diez'],
+      ['eleven', '11', 'once'], ['twelve', '12', 'doce'], ['thirteen', '13', 'trece'], ['fourteen', '14', 'catorce'],
+      ['fifteen', '15', 'quince'], ['sixteen', '16', 'dieciséis'], ['seventeen', '17', 'diecisiete'], ['eighteen', '18', 'dieciocho'],
+      ['nineteen', '19', 'diecinueve'], ['twenty', '20', 'veinte']
+    ]
+  };
+  /* ===== end DATA ===== */
+
+  const LETTER_NAMES = { a: 'ay', b: 'bee', c: 'see', d: 'dee', e: 'ee', f: 'eff', g: 'jee', h: 'aitch', i: 'eye', j: 'jay', k: 'kay', l: 'el', m: 'em',
+    n: 'en', o: 'oh', p: 'pee', q: 'cue', r: 'ar', s: 'ess', t: 'tee', u: 'you', v: 'vee', w: 'double you', x: 'ex', y: 'why', z: 'zed' };
+  const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  const KB_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+  const REVEAL_MS = 3000;
+  const MAX_TYPED = 12;
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- words ---------- */
+
+  const WORDS = [];
+  const BY_ID = {};
+  Object.keys(DATA).forEach((lv) => DATA[lv].forEach((row) => {
+    const w = { id: row[0], word: row[0], l: row[0].toLowerCase(), pic: row[1], es: row[2], level: Number(lv), num: /^\d+$/.test(row[1]) };
+    WORDS.push(w);
+    BY_ID[w.id] = w;
+  }));
+  const ofLevel = (lv) => WORDS.filter((w) => w.level === lv);
+
+  const count = (s) => { const m = {}; for (const c of s) m[c] = (m[c] || 0) + 1; return m; };
+  function canBuild(target, pool) {
+    const p = count(pool);
+    for (const c of target) { if (!p[c]) return false; p[c]--; }
+    return true;
+  }
+  function makeTiles(w, lv) {
+    const letters = w.l.split('');
+    if (lv === 1) {
+      let t = Kit.shuffle(letters), tries = 0;
+      while (t.join('') === w.l && new Set(letters).size > 1 && tries++ < 20) t = Kit.shuffle(letters);
+      return t;
+    }
+    // Level 2: add extra letters that never let her build a different word from the list.
+    for (let tries = 0; tries < 300; tries++) {
+      const extras = Kit.sample(ALPHABET, EXTRA_TILES);
+      const pool = letters.concat(extras).join('');
+      const clash = WORDS.some((o) => o.l !== w.l && canBuild(o.l, pool) && !canBuild(o.l, w.l));
+      if (!clash) return Kit.shuffle(letters.concat(extras));
+    }
+    return Kit.shuffle(letters.concat(['q', 'x', 'z'])); // never reached in practice
+  }
+
+  /* ---------- state ---------- */
+
+  const store = Kit.store(SLUG);
+  const load = () => store.get({ best: {} });
+  const decks = {};
+  [1, 2, 3].forEach((lv) => { decks[lv] = Kit.deck(SLUG, ofLevel(lv).map((w) => w.id)); });
+
+  let level = 1, queue = [], pos = 0, score = 0, results = [];
+  let mode = 'idle'; // idle | answering | reveal | feedback
+  let attempt = 1, typed = [], tiles = [], used = [], voiceOn = true;
+  let revealTimer = null, speakToken = 0;
+
+  const el = { start: $('start'), play: $('play'), ans: $('ans'), tray: $('tray'), kb: $('kb'), fb: $('fb'), input: $('input'),
+    dots: $('dots'), go: $('go'), del: $('del'), msg: $('msg'), reveal: $('reveal') };
+
+  const cur = () => queue[pos].w;
+  const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /* ---------- start screen ---------- */
+
+  function showStart() {
+    clearTimeout(revealTimer);
+    speakToken++;
+    mode = 'idle';
+    el.play.hidden = true;
+    el.start.hidden = false;
+    $('novoice').hidden = Kit.canSpeak('en');
+    const s = load();
+    const box = $('levels');
+    box.textContent = '';
+    LEVELS.forEach((L) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lvl';
+      b.dataset.level = L.n;
+      b.innerHTML = '<span class="lvl__n"></span><span class="lvl__t"><span class="lvl__name"></span><span class="lvl__sub"></span></span><span class="lvl__side"><span class="mast"></span></span>';
+      b.querySelector('.lvl__n').textContent = L.n;
+      b.querySelector('.lvl__name').textContent = L.name;
+      b.querySelector('.lvl__sub').textContent = L.sub;
+      const st = decks[L.n].stats();
+      b.querySelector('.mast').textContent = '🐝 ' + st.mastered + '/' + st.total;
+      b.querySelector('.mast').setAttribute('aria-label', st.mastered + ' de ' + st.total + ' palabras dominadas');
+      b.querySelector('.lvl__side').insertBefore(Kit.stars.el(s.best[L.n] || 0, 3), b.querySelector('.mast'));
+      b.addEventListener('click', () => { Kit.sfx('tap'); startRound(L.n); });
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- round ---------- */
+
+  function startRound(lv) {
+    level = lv;
+    voiceOn = Kit.canSpeak('en');
+    queue = decks[lv].next(ROUND).map((id, i) => ({ w: BY_ID[id], orig: i, rep: false }));
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    el.start.hidden = true;
+    el.play.hidden = false;
+    el.tray.hidden = lv === 3;
+    el.kb.hidden = lv !== 3;
+    if (lv === 3) buildKeyboard();
+    showWord();
+  }
+
+  function renderDots() {
+    el.dots.textContent = '';
+    const it = queue[pos];
+    results.forEach((r, i) => {
+      const d = document.createElement('i');
+      if (r === true) d.className = 'is-done';
+      else if (r === false) d.className = 'is-miss';
+      if (it && !it.rep && it.orig === i) d.classList.add('is-current');
+      el.dots.appendChild(d);
+    });
+  }
+
+  function speakWord(rate) { if (voiceOn) return Kit.speak(cur().word, 'en', { rate: rate || 0.9 }); return Promise.resolve(); }
+
+  function showWord() {
+    const w = cur();
+    clearTimeout(revealTimer);
+    speakToken++;
+    attempt = 1;
+    renderDots();
+    $('pic').textContent = w.pic;
+    $('pic').classList.toggle('is-num', w.num);
+    $('es').textContent = w.es;
+    $('es').classList.toggle('is-big', !voiceOn);
+    $('listen').hidden = !voiceOn;
+    beginInput('Escucha y escribe la palabra.');
+    speakWord();
+  }
+
+  function beginInput(message) {
+    mode = 'answering';
+    typed = [];
+    used = [];
+    tiles = level === 3 ? [] : makeTiles(cur(), level);
+    el.input.hidden = false;
+    el.fb.hidden = true;
+    el.reveal.textContent = '';
+    el.msg.textContent = voiceOn ? message : message.replace('Escucha y escribe', 'Lee y escribe');
+    render();
+  }
+
+  /* ---------- rendering the answer ---------- */
+
+  function slotEl(ch, cls) {
+    const s = document.createElement('span');
+    s.className = 'slot' + (cls ? ' ' + cls : '');
+    s.textContent = ch || '';
+    return s;
+  }
+
+  function render(marks) {
+    const w = cur().l;
+    el.ans.textContent = '';
+    let n;
+    if (marks) n = Math.max(typed.length, w.length);
+    else if (level === 3) n = Math.min(MAX_TYPED, typed.length + 1);
+    else n = w.length;
+    for (let i = 0; i < n; i++) {
+      let cls = '';
+      if (marks) cls = marks[i] ? 'is-ok' : 'is-ko';
+      else if (i === typed.length) cls = 'is-cur';
+      el.ans.appendChild(slotEl(typed[i] || '', cls));
+    }
+    el.ans.classList.toggle('dense', n > 7);
+    el.ans.setAttribute('aria-label', typed.length ? 'Has escrito: ' + typed.join(' ') : 'Aún no has escrito nada');
+
+    if (level < 3) {
+      el.tray.textContent = '';
+      tiles.forEach((ch, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'k-tile';
+        b.textContent = ch;
+        b.disabled = used.indexOf(i) >= 0 || mode !== 'answering';
+        b.addEventListener('click', () => { addTile(i); b.blur(); });
+        el.tray.appendChild(b);
+      });
+    }
+    const ready = level === 3 ? typed.length > 0 : typed.length === w.length;
+    el.go.disabled = !(ready && mode === 'answering');
+    el.del.disabled = !(typed.length && mode === 'answering');
+  }
+
+  /* ---------- input ---------- */
+
+  function addTile(i) {
+    if (mode !== 'answering' || used.indexOf(i) >= 0 || typed.length >= cur().l.length) return;
+    Kit.sfx('tap');
+    used.push(i);
+    typed.push(tiles[i]);
+    render();
+  }
+  function typeLetter(ch) {
+    if (mode !== 'answering') return;
+    if (level === 3) {
+      if (typed.length >= MAX_TYPED) return;
+      Kit.sfx('tap');
+      typed.push(ch);
+      render();
+    } else {
+      const i = tiles.findIndex((t, k) => t === ch && used.indexOf(k) < 0);
+      if (i >= 0) addTile(i);
+    }
+  }
+  function erase() {
+    if (mode !== 'answering' || !typed.length) return;
+    Kit.sfx('tap');
+    typed.pop();
+    if (level < 3) used.pop();
+    render();
+  }
+
+  function buildKeyboard() {
+    el.kb.textContent = '';
+    KB_ROWS.forEach((row) => {
+      const r = document.createElement('div');
+      r.className = 'kb-row';
+      row.split('').forEach((ch) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'kb-key';
+        b.textContent = ch;
+        b.addEventListener('click', () => { typeLetter(ch); b.blur(); });
+        r.appendChild(b);
+      });
+      el.kb.appendChild(r);
+    });
+  }
+
+  /* ---------- checking ---------- */
+
+  function marksFor(guess, word) { return guess.split('').map((c, i) => c === word[i]).concat(word.split('').slice(guess.length).map(() => false)); }
+
+  function check() {
+    if (mode !== 'answering') return;
+    const it = queue[pos], w = it.w;
+    const guess = typed.join('');
+    if (guess === '' || (level < 3 && guess.length !== w.l.length)) return;
+    const right = guess === w.l;
+    const counts = attempt === 1 && !it.rep;
+
+    if (right) {
+      mode = 'feedback';
+      Kit.sfx('ok');
+      render(marksFor(guess, w.l));
+      if (counts) { score++; results[it.orig] = true; decks[level].mark(w.id, true); }
+      showFeedback(true, w);
+      celebrate(w);
+    } else {
+      Kit.sfx('ko');
+      render(marksFor(guess, w.l));
+      if (counts) {
+        results[it.orig] = false;
+        decks[level].mark(w.id, false);
+        const at = Math.min(queue.length, pos + 1 + Kit.randInt(2, 4));
+        queue.splice(at, 0, { w, orig: it.orig, rep: true });
+      }
+      renderDots();
+      if (attempt === 1) startReveal(w);
+      else { mode = 'feedback'; showFeedback(false, w); }
+    }
+  }
+
+  function spellRow(word, target) {
+    target.textContent = '';
+    target.classList.toggle('dense', word.length > 7);
+    word.split('').forEach((c) => target.appendChild(slotEl(c)));
+  }
+
+  function showFeedback(right, w) {
+    el.input.hidden = true;
+    el.fb.hidden = false;
+    el.msg.textContent = '';
+    const t = $('fb-title');
+    t.className = 'fb__title ' + (right ? 'is-ok' : 'is-ko');
+    t.textContent = right ? '✓ ' + Kit.praise() : '✗ ' + Kit.encourage();
+    spellRow(w.word, el.reveal);
+    $('fb-note').textContent = right ? '' : 'Se escribe así. ¡La verás otra vez!';
+    $('next').hidden = false;
+    $('next').focus({ preventScroll: true });
+  }
+
+  function startReveal(w) {
+    mode = 'reveal';
+    el.input.hidden = true;
+    el.fb.hidden = false;
+    el.msg.textContent = '';
+    const t = $('fb-title');
+    t.className = 'fb__title is-ko';
+    t.textContent = '✗ ' + Kit.encourage();
+    spellRow(w.word, el.reveal);
+    $('fb-note').textContent = 'Mírala bien. Ahora la escribirás otra vez.';
+    $('next').hidden = true;
+    speakWord(0.6);
+    const myPos = pos;
+    revealTimer = setTimeout(() => {
+      if (mode !== 'reveal' || pos !== myPos) return;
+      attempt = 2;
+      beginInput('Ahora escríbela tú otra vez.');
+    }, REVEAL_MS);
+  }
+
+  async function celebrate(w) {
+    if (!voiceOn) return;
+    const tok = ++speakToken;
+    await Kit.speak(w.word, 'en');
+    const slots = el.reveal.children;
+    for (let i = 0; i < w.l.length; i++) {
+      if (tok !== speakToken) return;
+      if (slots[i]) slots[i].classList.add('is-say');
+      await Kit.speak(LETTER_NAMES[w.l[i]], 'en', { rate: 0.8 });
+      if (slots[i]) slots[i].classList.remove('is-say');
+      await delay(120);
+    }
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    speakToken++;
+    pos++;
+    if (pos >= queue.length) finish();
+    else showWord();
+  }
+
+  /* ---------- result ---------- */
+
+  function finish() {
+    mode = 'idle';
+    const n = Kit.stars.calc(score, ROUND);
+    const s = load();
+    const best = Object.assign({}, s.best);
+    best[level] = Math.max(best[level] || 0, n);
+    store.set({ best });
+    const extra = document.createElement('div');
+    extra.className = 'bee';
+    extra.setAttribute('aria-hidden', 'true');
+    extra.textContent = '🐝';
+    Kit.result({ slug: SLUG, score, total: ROUND, extra, onAgain: () => startRound(level),
+      actions: [{ label: 'Elegir nivel', onClick: showStart }] });
+  }
+
+  /* ---------- wiring ---------- */
+
+  $('go').addEventListener('click', check);
+  $('del').addEventListener('click', erase);
+  $('next').addEventListener('click', next);
+  $('say').addEventListener('click', () => { if (mode !== 'idle') speakWord(0.9); });
+  $('slow').addEventListener('click', () => { if (mode !== 'idle') speakWord(0.6); });
+  $('quit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (el.play.hidden || document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^[a-zA-Z]$/.test(e.key)) { e.preventDefault(); typeLetter(e.key.toLowerCase()); }
+    else if (e.key === 'Backspace') { e.preventDefault(); erase(); }
+    else if (e.key === 'Enter') {
+      if (document.activeElement && document.activeElement.id === 'quit') return;
+      e.preventDefault();
+      if (mode === 'answering') check(); else if (mode === 'feedback') next();
+    }
+  });
+
+  Kit.mount({ slug: SLUG, title: 'Spelling Bee' });
+  Kit.ready.then(showStart);
+
+  // Hooks for the automated checks (not used by the game itself).
+  window.__bee = { WORDS, LEVELS, ROUND, makeTiles, canBuild, ofLevel, decks, get state() { return { level, pos, mode, attempt, score, queue: queue.map((q) => q.w.id + (q.rep ? '*' : '')) }; } };
+})();
+</script>
+</body>
+</html>
