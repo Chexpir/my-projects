@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Robot explorador: programa al robot para llegar a la estrella.">
+<meta name="theme-color" content="#fff8ec">
+<title>Robot explorador</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .lv-menu { display: flex; flex-direction: column; gap: 6px; }
+  .lv-menu > h2 { margin: 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .lv-menu > p { margin: 0; text-align: center; color: var(--muted); font-weight: 700; }
+  .grp { display: flex; flex-direction: column; gap: 4px; }
+  .grp h3 { margin: 0; font-size: 20px; font-weight: 900; }
+  .grp__row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .lv {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+    min-width: 56px; min-height: 72px; padding: 4px 0;
+    border: 3px solid var(--accent); border-radius: 16px; background: var(--card); color: var(--ink);
+    box-shadow: 0 4px 0 var(--accent); cursor: pointer; font-size: 26px; font-weight: 900; line-height: 1.1;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .lv:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lv:disabled { border-color: var(--line); background: #efeae0; box-shadow: none; color: var(--muted); cursor: not-allowed; }
+  .lv.is-next { background: var(--accent); color: var(--on-accent); }
+  .lv .k-stars { font-size: 16px; gap: 0; }
+  .lv.is-next .k-stars .off { color: rgba(255, 255, 255, 0.55); }
+  .lv__lock { font-size: 20px; line-height: 1.5; }
+  @media (min-width: 700px) { .lv { min-height: 84px; } .lv .k-stars { font-size: 20px; } }
+
+  .play { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .status-row { display: flex; align-items: center; gap: 8px; min-height: 56px; }
+  .status { flex: 1; min-width: 0; margin: 0; font-size: 20px; font-weight: 800; line-height: 1.2; }
+  .status.is-ok { color: var(--ok); }
+  .status.is-ko { color: var(--ko); }
+  .round {
+    flex: none; width: 56px; height: 56px; padding: 0; border-radius: 50%; border: 2px solid var(--line);
+    background: var(--card); font-size: 26px; line-height: 1; cursor: pointer; color: var(--ink);
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .round:active { transform: translateY(2px); }
+  .lvl-tag { flex: none; font-size: 20px; font-weight: 900; color: var(--accent); white-space: nowrap; }
+
+  .board-wrap { flex: 1 1 0; min-height: 100px; container-type: size; display: grid; place-items: center; }
+  .board {
+    --s: min(calc((100cqw - 8px) / var(--cols)), calc((100cqh - 8px) / var(--rows)));
+    position: relative; display: grid;
+    grid-template-columns: repeat(var(--cols), var(--s)); grid-template-rows: repeat(var(--rows), var(--s));
+    width: calc(var(--s) * var(--cols)); height: calc(var(--s) * var(--rows));
+    border: 4px solid var(--ink); border-radius: 12px; background: var(--card); font-size: calc(var(--s) * 0.6);
+    box-sizing: content-box; overflow: hidden;
+  }
+  .cell { position: relative; display: grid; place-items: center; line-height: 1; background: #fffdf6; }
+  .cell.alt { background: #f3efe2; }
+  .cell.start::before { content: ""; position: absolute; inset: 12%; border-radius: 50%; border: 3px dotted #9aa5b1; }
+  .cell.wall { background: #c9764c; }
+  .cell.wall > span { font-size: 0.8em; }
+  .cell.star > span { animation: pulse 1.6s ease-in-out infinite; }
+  .cell.gem.is-got > span { visibility: hidden; }
+  .cell.is-hit { background: #fde3e1; }
+  .cell.is-win { background: var(--ok-bg); }
+  .mark {
+    position: absolute; z-index: 3; width: var(--s); height: var(--s); left: 0; top: 0; pointer-events: none;
+    border: 4px dashed var(--ko); border-radius: 8px; box-sizing: border-box;
+  }
+  .mark::after {
+    content: "\2717"; position: absolute; right: 2px; top: -2px; font-size: calc(var(--s) * 0.34); font-weight: 900;
+    color: #fff; background: var(--ko); border-radius: 50%; width: 1.25em; height: 1.25em; display: grid; place-items: center; line-height: 1;
+  }
+  .robot {
+    position: absolute; z-index: 2; left: 0; top: 0; width: var(--s); height: var(--s);
+    display: grid; place-items: center; line-height: 1; pointer-events: none;
+    transition: transform 0.3s ease;
+  }
+  .robot > span { display: block; }
+  .robot.is-bump > span { animation: bump 0.4s ease; }
+  .robot.is-win > span { animation: hop 0.6s ease 2; }
+  @keyframes bump { 0%, 100% { transform: translate(0, 0); } 35% { transform: translate(var(--bx), var(--by)); } 65% { transform: translate(calc(var(--bx) * -0.3), calc(var(--by) * -0.3)); } }
+  @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-25%); } }
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+  .prog-card { padding: 8px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 3px 0 var(--line); }
+  .prog-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 20px; font-weight: 800; line-height: 1.1; }
+  .prog-head .count { color: var(--muted); }
+  .prog-head .count.is-full { color: var(--ko); }
+  .prog { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; min-height: 56px; }
+  .prog-empty { align-self: center; color: var(--muted); font-weight: 700; font-size: 20px; padding: 0 4px; }
+  .chip {
+    flex: none; width: 56px; height: 56px; padding: 0; border: 3px solid var(--accent); border-radius: 14px;
+    background: #fff; color: var(--ink); font-size: 32px; font-weight: 900; line-height: 1; cursor: pointer;
+    box-shadow: 0 3px 0 var(--accent);
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .chip:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent); }
+  .chip.is-run, .blk.is-run > .chip--rep { background: var(--accent); color: var(--on-accent); }
+  .chip--rep { width: auto; min-width: 56px; padding: 0 6px; font-size: 20px; }
+  .blk {
+    display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px; max-width: 100%;
+    border: 3px solid var(--line); border-radius: 18px; background: #eef9fa; cursor: pointer;
+  }
+  .blk.is-open { border-style: dashed; border-color: var(--accent); background: #dff3f5; }
+  .blk-hint { align-self: center; padding: 0 6px; color: var(--muted); font-size: 20px; font-weight: 800; }
+
+  .controls { display: flex; flex-direction: column; gap: 8px; }
+  .cmds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .cmds.has-rep { grid-template-columns: repeat(4, minmax(56px, 1fr)) minmax(72px, 1.3fr); }
+  .cmd {
+    min-width: 56px; min-height: 56px; border: 3px solid var(--accent); border-radius: 16px; background: var(--card);
+    color: var(--ink); font-size: 34px; font-weight: 900; line-height: 1; cursor: pointer; box-shadow: 0 3px 0 var(--accent);
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .cmd:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent); }
+  .cmd:disabled, .chip:disabled { opacity: 0.45; cursor: not-allowed; }
+  .cmd.rep-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0 2px; font-size: 16px; font-weight: 800; border-color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .rep-btn b { font-size: 22px; line-height: 1; font-weight: 900; }
+  .cmd.rep-btn.is-open { background: var(--ok); color: #fff; border-color: var(--ok); box-shadow: 0 3px 0 #146b39; }
+  .acts { display: flex; gap: 8px; }
+  .acts .go { flex: 1; }
+  .acts .k-btn { font-size: 22px; padding: 0 16px; }
+  .acts .k-btn--ghost { flex: none; }
+
+  @media (max-height: 700px) { .controls { gap: 6px; } .play { gap: 6px; } .prog-card { padding: 6px 8px; gap: 2px; } }
+  @media (max-width: 400px) { .acts .k-btn { padding: 0 12px; font-size: 20px; } }
+  .nivel-txt { display: none; }
+  @media (min-width: 560px) { .nivel-txt { display: inline; } .round.is-wide { width: auto; padding: 0 18px; border-radius: 999px; font-size: 22px; font-weight: 800; } }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir nivel">
+    <div class="lv-menu">
+      <h2>¡Elige un nivel!</h2>
+      <div id="groups" class="lv-menu"></div>
+      <p>🔒 Resuelve un nivel para abrir el siguiente.</p>
+    </div>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="status-row">
+      <button type="button" class="round is-wide" id="back" aria-label="Volver a los niveles" title="Niveles">🗺️<span class="nivel-txt"> Niveles</span></button>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <button type="button" class="round" id="say" aria-label="Escuchar la explicación">🔊</button>
+    </div>
+    <div class="board-wrap"><div class="board" id="board" role="img" aria-label="Tablero"></div></div>
+    <div class="k-card prog-card">
+      <div class="prog-head"><span id="lvtag" class="lvl-tag"></span><span class="count" id="count"></span></div>
+      <div class="prog" id="prog" aria-label="Programa"></div>
+    </div>
+    <div class="controls">
+      <div class="cmds" id="cmds" role="group" aria-label="Órdenes"></div>
+      <div class="acts">
+        <button type="button" class="k-btn k-btn--big go" id="go">▶ Probar</button>
+        <button type="button" class="k-btn k-btn--big k-btn--ghost" id="clear">Borrar todo</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: levels (edit here) =====
+     map:   '#' wall, 'R' robot, 'S' star, 'G' gem, '.' empty. Rows go top to bottom.
+     par:   length of the shortest program ("Repetir" = 1 + the commands inside it).
+     limit: most commands allowed (null = no limit besides MAX_FREE).
+     text:  optional instruction shown instead of the default one.
+     ref:   one shortest program: 'U' 'D' 'L' 'R' or [times, 'commands'] for a Repetir block. */
+  const DATA = [
+    { n: 1, par: 3, limit: null,
+      text: 'Toca flechas y pulsa Probar.',
+      map: ['.....', '.....', 'R..S.', '.....', '.....'],
+      ref: ['R', 'R', 'R'] },
+    { n: 2, par: 3, limit: null,
+      map: ['.....', '..S..', '.....', '.....', '..R..'],
+      ref: ['U', 'U', 'U'] },
+    { n: 3, par: 5, limit: null,
+      map: ['.....', '.....', '...S.', '.....', 'R....'],
+      ref: ['U', 'U', 'R', 'R', 'R'] },
+    { n: 4, par: 8, limit: null,
+      map: ['....S', '.###.', '.###.', '.###.', 'R....'],
+      ref: ['U', 'U', 'U', 'U', 'R', 'R', 'R', 'R'] },
+    { n: 5, par: 6, limit: null,
+      map: ['R....', '.###.', '.###.', '.....', '..S..'],
+      ref: ['D', 'D', 'D', 'D', 'R', 'R'] },
+    { n: 6, par: 8, limit: null,
+      text: 'Rodea los muros 🧱.',
+      map: ['..#S.', 'R.#..', '..#.#', '.....', '.....'],
+      ref: ['D', 'D', 'R', 'R', 'R', 'U', 'U', 'U'] },
+    { n: 7, par: 8, limit: null,
+      map: ['R.#...', '..#...', '..#.S.', '......', '......', '......'],
+      ref: ['D', 'D', 'D', 'R', 'R', 'R', 'U', 'R'] },
+    { n: 8, par: 9, limit: null,
+      map: ['R.#..', '..#.S', '..#..', '.....', '.....'],
+      ref: ['D', 'D', 'D', 'R', 'R', 'R', 'U', 'U', 'R'] },
+    { n: 9, par: 9, limit: null,
+      map: ['R.#..S', '..#.#.', '....#.', '##.##.', '....#.', '......'],
+      ref: ['D', 'D', 'R', 'R', 'R', 'U', 'U', 'R', 'R'] },
+    { n: 10, par: 11, limit: null,
+      map: ['R..#.', '...#S', '##.#.', '...#.', '.....'],
+      ref: ['D', 'R', 'R', 'D', 'D', 'D', 'R', 'R', 'U', 'U', 'U'] },
+    { n: 11, par: 2, limit: 4,
+      text: '¡Nuevo! 🔁 repite órdenes.',
+      map: ['.......', '.......', 'R....S.', '.......', '.......'],
+      ref: [[5, 'R']] },
+    { n: 12, par: 4, limit: 6,
+      map: ['R....', '.###.', '.###.', '.###.', '....S'],
+      ref: [[4, 'D'], [4, 'R']] },
+    { n: 13, par: 3, limit: 5,
+      map: ['R....', '.....', '.....', '.....', '....S'],
+      ref: [[4, 'DR']] },
+    { n: 14, par: 6, limit: 8,
+      map: ['R.....', '#####.', 'S.....', '......', '......'],
+      ref: [[5, 'R'], [2, 'D'], [5, 'L']] },
+    { n: 15, par: 7, limit: 9,
+      map: ['R.#....', '.##.#..', '...##.S', '....#..', '.......'],
+      ref: [[4, 'D'], [4, 'R'], [2, 'RU']] },
+    { n: 16, par: 6, limit: 8,
+      map: ['.......', '...G...', '.......', 'R.....S', '.......'],
+      ref: [[3, 'U'], [3, 'RDR']] },
+    { n: 17, par: 4, limit: 6,
+      map: ['R.....', '.G.G..', '.....S', '......', '......'],
+      ref: [[3, 'RDR']] },
+    { n: 18, par: 3, limit: 5,
+      map: ['.....S', '....G.', '...G..', '..G...', '.G....', 'R.....'],
+      ref: [[5, 'UR']] },
+    { n: 19, par: 6, limit: 8,
+      map: ['R...G', '####.', 'S.G..', '.....', '.....'],
+      ref: [[4, 'R'], [2, 'D'], [4, 'L']] },
+    { n: 20, par: 8, limit: 10,
+      map: ['......', 'G#....', '..#GG.', '#...R.', '..S...'],
+      ref: [[3, 'UL'], 'L', [2, 'DDR']] }
+  ];
+  const GROUPS = [
+    { name: 'Rectas y un giro', from: 1 },
+    { name: 'Rodeando muros', from: 6 },
+    { name: '¡A repetir! 🔁', from: 11 },
+    { name: 'Gemas 💎', from: 16 }
+  ];
+  /* ===== end DATA ===== */
+
+  const SLUG = 'robot';
+  const STEP_MS = 400;     // time per step while running
+  const MAX_FREE = 12;     // commands allowed in levels without a limit
+  const MAX_BODY = 3;      // commands inside one Repetir block
+  const DIRS = {
+    U: { dx: 0, dy: -1, glyph: '↑', name: 'arriba' },
+    D: { dx: 0, dy: 1, glyph: '↓', name: 'abajo' },
+    L: { dx: -1, dy: 0, glyph: '←', name: 'izquierda' },
+    R: { dx: 1, dy: 0, glyph: '→', name: 'derecha' }
+  };
+  const ORDER = ['L', 'U', 'D', 'R'];
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- pure game logic (also used by test.html) ---------- */
+
+  function parseLevel(lv) {
+    const o = { h: lv.map.length, w: lv.map[0].length, walls: new Set(), gems: [], start: null, star: null };
+    lv.map.forEach((row, y) => [...row].forEach((c, x) => {
+      if (c === '#') o.walls.add(x + ',' + y);
+      else if (c === 'R') o.start = { x, y };
+      else if (c === 'S') o.star = { x, y };
+      else if (c === 'G') o.gems.push({ x, y });
+    }));
+    return o;
+  }
+  const gemIndex = (g, x, y) => g.gems.findIndex((q) => q.x === x && q.y === y);
+  const allMask = (g) => (1 << g.gems.length) - 1;
+  const startState = (g) => ({ x: g.start.x, y: g.start.y, mask: 0 });
+
+  // One step. Returns { ok, st, why, wall } where `st` is the new state (or the unchanged one when blocked).
+  function stepOnce(g, st, d) {
+    const nx = st.x + DIRS[d].dx, ny = st.y + DIRS[d].dy;
+    if (nx < 0 || ny < 0 || nx >= g.w || ny >= g.h) return { ok: false, st, why: 'edge', tx: nx, ty: ny };
+    if (g.walls.has(nx + ',' + ny)) return { ok: false, st, why: 'wall', tx: nx, ty: ny };
+    let mask = st.mask;
+    const gi = gemIndex(g, nx, ny);
+    if (gi >= 0) mask |= 1 << gi;
+    return { ok: true, st: { x: nx, y: ny, mask } };
+  }
+  const isWin = (g, st) => st.x === g.star.x && st.y === g.star.y && st.mask === allMask(g);
+
+  // A program is a list of 'U' 'D' 'L' 'R' and [times, 'commands'] blocks.
+  function flatten(prog) {
+    const out = [];
+    prog.forEach((it) => {
+      if (typeof it === 'string') out.push(it);
+      else for (let i = 0; i < it[0]; i++) [...it[1]].forEach((c) => out.push(c));
+    });
+    return out;
+  }
+  const cost = (prog) => prog.reduce((s, it) => s + (typeof it === 'string' ? 1 : 1 + it[1].length), 0);
+  function simulate(lv, prog) {
+    const g = parseLevel(lv);
+    let st = startState(g);
+    const steps = flatten(prog);
+    for (let i = 0; i < steps.length; i++) {
+      const r = stepOnce(g, st, steps[i]);
+      if (!r.ok) return { result: r.why, st, step: i };
+      st = r.st;
+      if (isWin(g, st)) return { result: 'win', st, step: i };
+    }
+    return { result: 'end', st, step: steps.length };
+  }
+  const starsFor = (c, par) => (c <= par ? 3 : c <= par + 2 ? 2 : 1);
+
+  window.RobotGame = { DATA, MAX_BODY, MAX_FREE, parseLevel, stepOnce, isWin, flatten, cost, simulate, starsFor };
+
+  /* ---------- progress ---------- */
+
+  const store = Kit.store(SLUG);
+  const loadStars = () => { const s = store.get({ lv: {} }).lv; return s && typeof s === 'object' ? s : {}; };
+  const levelStars = (n) => Number(loadStars()[n]) || 0;
+  const isOpen = (n) => n === 1 || levelStars(n - 1) >= 1;
+
+  /* ---------- start screen ---------- */
+
+  function showStart() {
+    stopRun();
+    $('play').hidden = true;
+    $('start').hidden = false;
+    const root = $('groups');
+    root.textContent = '';
+    const stars = loadStars();
+    const next = DATA.find((l) => isOpen(l.n) && !(stars[l.n] >= 1));
+    GROUPS.forEach((gr, gi) => {
+      const sec = document.createElement('section');
+      sec.className = 'grp';
+      const h = document.createElement('h3');
+      h.textContent = gr.name;
+      sec.appendChild(h);
+      const row = document.createElement('div');
+      row.className = 'grp__row';
+      DATA.filter((l) => l.n >= gr.from && l.n < gr.from + 5).forEach((l) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'lv' + (next && next.n === l.n ? ' is-next' : '');
+        const open = isOpen(l.n);
+        b.disabled = !open;
+        b.setAttribute('aria-label', 'Nivel ' + l.n + (open ? ', ' + (stars[l.n] || 0) + ' de 3 estrellas' : ', cerrado'));
+        const num = document.createElement('span');
+        num.textContent = l.n;
+        b.appendChild(num);
+        if (open) b.appendChild(Kit.stars.el(Number(stars[l.n]) || 0, 3));
+        else { const k = document.createElement('span'); k.className = 'lv__lock'; k.setAttribute('aria-hidden', 'true'); k.textContent = '🔒'; b.appendChild(k); }
+        b.addEventListener('click', () => { Kit.sfx('tap'); loadLevel(l.n); });
+        row.appendChild(b);
+      });
+      sec.appendChild(row);
+      root.appendChild(sec);
+    });
+  }
+
+  /* ---------- play state ---------- */
+
+  let lv = null;          // current DATA entry
+  let g = null;           // parsed level
+  let prog = [];          // [{k:'a', d}] or [{k:'r', n, body:[d]}]
+  let open = -1;          // index of the Repetir block that receives new commands
+  let running = false;
+  let timer = null;
+  let st = null;          // robot state
+  let cells = {};         // 'x,y' -> element
+  let robotEl = null;
+  let markEl = null;
+  let defaultStatus = '';
+  const refs = { items: [] }; // DOM refs for highlighting while running
+
+  const capOf = () => (lv.limit || MAX_FREE);
+  const progCost = () => prog.reduce((s, it) => s + (it.k === 'a' ? 1 : 1 + it.body.length), 0);
+  const toRef = () => prog.map((it) => (it.k === 'a' ? it.d : [it.n, it.body.join('')]));
+
+  function setStatus(text, cls) {
+    const el = $('status');
+    el.textContent = text;
+    el.className = 'status' + (cls ? ' is-' + cls : '');
+  }
+  function plainSpeech(t) {
+    return t.replace(/🤖/g, 'el robot').replace(/⭐/g, 'la estrella').replace(/💎/g, 'las gemas')
+      .replace(/🔁/g, 'Repetir').replace(/🧱/g, 'muros').replace(/[\u{1F300}-\u{1FAFF}☀-➿️]/gu, '');
+  }
+  function instruction() {
+    return lv.text || baseText();
+  }
+  const baseText = () => (g.gems.length ? 'Recoge los 💎 y llega a la ⭐.' : 'Lleva al robot 🤖 hasta la ⭐.');
+  // What the speaker button reads: the full explanation.
+  function spoken() {
+    const extra = lv.n === 1 ? ' Toca las flechas para hacer tu programa. Luego pulsa Probar.'
+      : lv.n === 11 ? ' Repetir hace lo mismo varias veces.' : '';
+    return baseText() + extra + (lv.limit ? ' Máximo ' + lv.limit + ' órdenes.' : '');
+  }
+
+  function loadLevel(n) {
+    stopRun();
+    lv = DATA.find((l) => l.n === n);
+    g = parseLevel(lv);
+    prog = [];
+    open = -1;
+    $('start').hidden = true;
+    $('play').hidden = false;
+    $('lvtag').textContent = 'Nivel ' + n;
+    $('rep').hidden = n < 11;
+    $('cmds').classList.toggle('has-rep', n >= 11);
+    buildBoard();
+    renderProg();
+    defaultStatus = instruction();
+    setStatus(defaultStatus);
+    $('go').textContent = '▶ Probar';
+    setDisabled(false);
+  }
+
+  /* ---------- board ---------- */
+
+  function buildBoard() {
+    const b = $('board');
+    b.textContent = '';
+    b.style.setProperty('--cols', g.w);
+    b.style.setProperty('--rows', g.h);
+    b.setAttribute('aria-label', 'Tablero de ' + g.w + ' por ' + g.h + (g.gems.length ? ' con ' + g.gems.length + ' gemas' : ''));
+    cells = {};
+    for (let y = 0; y < g.h; y++) {
+      for (let x = 0; x < g.w; x++) {
+        const c = document.createElement('div');
+        c.className = 'cell' + ((x + y) % 2 ? ' alt' : '');
+        const key = x + ',' + y;
+        const put = (txt) => { const s = document.createElement('span'); s.setAttribute('aria-hidden', 'true'); s.textContent = txt; c.appendChild(s); };
+        if (g.walls.has(key)) { c.classList.add('wall'); put('🧱'); }
+        else if (x === g.star.x && y === g.star.y) { c.classList.add('star'); put('⭐'); }
+        else if (gemIndex(g, x, y) >= 0) { c.classList.add('gem'); put('💎'); }
+        if (x === g.start.x && y === g.start.y) c.classList.add('start');
+        cells[key] = c;
+        b.appendChild(c);
+      }
+    }
+    robotEl = document.createElement('div');
+    robotEl.className = 'robot';
+    const rs = document.createElement('span');
+    rs.textContent = '🤖';
+    rs.setAttribute('aria-hidden', 'true');
+    robotEl.appendChild(rs);
+    b.appendChild(robotEl);
+    markEl = null;
+    st = startState(g);
+    placeRobot(false);
+  }
+  function placeRobot(animate) {
+    if (!animate) { robotEl.style.transition = 'none'; }
+    robotEl.style.transform = 'translate(' + st.x * 100 + '%, ' + st.y * 100 + '%)';
+    if (!animate) { void robotEl.offsetWidth; robotEl.style.transition = ''; }
+  }
+  function resetBoard() {
+    st = startState(g);
+    if (markEl && markEl.parentNode) markEl.parentNode.removeChild(markEl);
+    markEl = null;
+    Object.keys(cells).forEach((k) => cells[k].classList.remove('is-got', 'is-hit', 'is-win'));
+    g.gems.forEach((q) => cells[q.x + ',' + q.y].classList.remove('is-got'));
+    robotEl.classList.remove('is-bump', 'is-win');
+    placeRobot(false);
+  }
+  function markAt(x, y) {
+    markEl = document.createElement('div');
+    markEl.className = 'mark';
+    markEl.style.transform = 'translate(' + x * 100 + '%, ' + y * 100 + '%)';
+    $('board').appendChild(markEl);
+  }
+
+  /* ---------- program editing ---------- */
+
+  function closeOpen() {
+    if (open >= 0 && prog[open] && !prog[open].body.length) prog.splice(open, 1);
+    open = -1;
+  }
+  function edited() {
+    resetBoard();
+    renderProg();
+  }
+  function note(text, cls) { setStatus(text, cls); }
+
+  function addDir(d) {
+    if (running) return;
+    Kit.sfx('tap');
+    if (progCost() >= capOf()) { Kit.sfx('ko'); note('No caben más órdenes. Toca una para quitarla.', 'ko'); return; }
+    if (open >= 0 && prog[open]) {
+      const blk = prog[open];
+      if (blk.body.length >= MAX_BODY) { open = -1; }
+      else {
+        blk.body.push(d);
+        if (blk.body.length >= MAX_BODY) open = -1;
+        resetStatus();
+        edited();
+        return;
+      }
+    }
+    prog.push({ k: 'a', d });
+    resetStatus();
+    edited();
+  }
+  function resetStatus() { setStatus(open >= 0 ? 'Pon flechas dentro de 🔁. Luego toca ✓.' : defaultStatus); }
+
+  function toggleRepeat() {
+    if (running) return;
+    Kit.sfx('tap');
+    if (open >= 0) { closeOpen(); resetStatus(); edited(); return; }
+    if (progCost() >= capOf()) { Kit.sfx('ko'); note('No caben más órdenes. Toca una para quitarla.', 'ko'); return; }
+    prog.push({ k: 'r', n: 2, body: [] });
+    open = prog.length - 1;
+    resetStatus();
+    edited();
+  }
+  function removeTop(i) {
+    if (running) return;
+    Kit.sfx('tap');
+    const o = open >= 0 ? prog[open] : null;
+    const gone = prog.splice(i, 1)[0];
+    open = o && o !== gone ? prog.indexOf(o) : -1;
+    closeOpen();
+    resetStatus();
+    edited();
+  }
+  function removeBody(i, j) {
+    if (running) return;
+    Kit.sfx('tap');
+    const blk = prog[i];
+    blk.body.splice(j, 1);
+    focusBlock(blk); // the block stays open (even if empty) so she can fill it again
+    resetStatus();
+    edited();
+  }
+  function focusBlock(blk) {
+    if (open >= 0 && prog[open] !== blk) closeOpen(); // drops an empty block that was open
+    open = prog.indexOf(blk);
+  }
+  function cycleCount(i) {
+    if (running) return;
+    Kit.sfx('tap');
+    const b = prog[i];
+    b.n = b.n >= 5 ? 2 : b.n + 1;
+    edited();
+  }
+  function openBlock(i) {
+    if (running || open === i) return;
+    Kit.sfx('tap');
+    focusBlock(prog[i]);
+    resetStatus();
+    edited();
+  }
+  function clearAll() {
+    if (running) return;
+    Kit.sfx('tap');
+    prog = [];
+    open = -1;
+    setStatus(defaultStatus);
+    edited();
+  }
+
+  function mkChip(txt, label, onClick, cls) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (cls ? ' ' + cls : '');
+    b.textContent = txt;
+    b.setAttribute('aria-label', label);
+    b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+    return b;
+  }
+
+  function renderProg() {
+    const root = $('prog');
+    root.textContent = '';
+    refs.items = [];
+    if (!prog.length) {
+      const e = document.createElement('span');
+      e.className = 'prog-empty';
+      e.textContent = 'Toca las flechas de abajo ↓';
+      root.appendChild(e);
+    }
+    prog.forEach((it, i) => {
+      if (it.k === 'a') {
+        const c = mkChip(DIRS[it.d].glyph, 'Quitar ' + DIRS[it.d].name, () => removeTop(i));
+        root.appendChild(c);
+        refs.items[i] = { el: c };
+      } else {
+        const blk = document.createElement('div');
+        blk.className = 'blk' + (open === i ? ' is-open' : '');
+        blk.addEventListener('click', (e) => { if (e.target === blk) openBlock(i); });
+        const head = mkChip('🔁×' + it.n, 'Repetir ' + it.n + ' veces. Toca para cambiar cuántas veces', () => cycleCount(i), 'chip--rep');
+        blk.appendChild(head);
+        const bodyEls = it.body.map((d, j) => {
+          const c = mkChip(DIRS[d].glyph, 'Quitar ' + DIRS[d].name + ' de Repetir', () => removeBody(i, j));
+          blk.appendChild(c);
+          return c;
+        });
+        if (open === i && !it.body.length) {
+          const h = document.createElement('span');
+          h.className = 'blk-hint';
+          h.textContent = 'Flechas aquí';
+          blk.appendChild(h);
+        }
+        root.appendChild(blk);
+        refs.items[i] = { el: blk, head, bodyEls };
+      }
+    });
+    const cost = progCost(), cap = capOf();
+    const cnt = $('count');
+    cnt.textContent = lv.limit ? cost + ' de ' + cap + ' órdenes' : cost + (cost === 1 ? ' orden' : ' órdenes');
+    cnt.className = 'count' + (lv.limit && cost >= cap ? ' is-full' : '');
+    const rep = $('rep');
+    rep.innerHTML = open >= 0 ? '<b aria-hidden="true">✓</b>Listo' : '<b aria-hidden="true">🔁</b>Repetir';
+    rep.classList.toggle('is-open', open >= 0);
+    rep.setAttribute('aria-label', open >= 0 ? 'Cerrar el bloque Repetir' : 'Añadir un bloque Repetir');
+  }
+
+  function setDisabled(dis) {
+    document.querySelectorAll('#cmds .cmd, #rep, #clear').forEach((b) => { b.disabled = dis; });
+    document.querySelectorAll('#prog .chip').forEach((b) => { b.disabled = dis; });
+  }
+
+  /* ---------- running ---------- */
+
+  function stopRun() {
+    running = false;
+    if (timer) { clearTimeout(timer); timer = null; }
+    const go = $('go');
+    if (go) go.textContent = '▶ Probar';
+  }
+
+  function compile() {
+    const steps = [];
+    prog.forEach((it, i) => {
+      const r = refs.items[i];
+      if (it.k === 'a') steps.push({ d: it.d, el: r.el, blk: null });
+      else for (let n = 0; n < it.n; n++) it.body.forEach((d, j) => steps.push({ d, el: r.bodyEls[j], blk: r.el }));
+    });
+    return steps;
+  }
+
+  function run() {
+    if (running) { // second tap on "Parar"
+      Kit.sfx('tap');
+      stopRun();
+      setDisabled(false);
+      edited();
+      setStatus(defaultStatus);
+      return;
+    }
+    Kit.sfx('tap');
+    if (open >= 0) { closeOpen(); renderProg(); }
+    resetBoard();
+    const steps = compile();
+    if (!steps.length) { note('Primero toca unas flechas.', 'ko'); return; }
+    running = true;
+    $('go').textContent = '⏹ Parar';
+    setDisabled(true);
+    setStatus('Probando…');
+    let i = 0;
+    const clearHi = () => document.querySelectorAll('#prog .is-run').forEach((e) => e.classList.remove('is-run'));
+    const tick = () => {
+      clearHi();
+      if (i >= steps.length) { finish('end'); return; }
+      const s = steps[i];
+      s.el.classList.add('is-run');
+      if (s.blk) s.blk.classList.add('is-run');
+      const r = stepOnce(g, st, s.d);
+      i++;
+      if (!r.ok) { bump(s.d, r); return; }
+      st = r.st;
+      placeRobot(true);
+      const gi = gemIndex(g, st.x, st.y);
+      if (gi >= 0) { cells[st.x + ',' + st.y].classList.add('is-got'); Kit.sfx('ok'); } else Kit.sfx('tap');
+      if (isWin(g, st)) { timer = setTimeout(() => { clearHi(); finish('win'); }, STEP_MS * 0.6); return; }
+      timer = setTimeout(tick, STEP_MS);
+    };
+    timer = setTimeout(tick, 300);
+  }
+
+  function bump(d, r) {
+    robotEl.style.setProperty('--bx', DIRS[d].dx * 30 + '%');
+    robotEl.style.setProperty('--by', DIRS[d].dy * 30 + '%');
+    robotEl.classList.remove('is-bump'); void robotEl.offsetWidth; robotEl.classList.add('is-bump');
+    Kit.sfx('ko');
+    timer = setTimeout(() => {
+      document.querySelectorAll('#prog .is-run').forEach((e) => e.classList.remove('is-run'));
+      markAt(st.x, st.y);
+      cells[st.x + ',' + st.y].classList.add('is-hit');
+      finish(r.why);
+    }, 450);
+  }
+
+  function finish(kind) {
+    stopRun();
+    setDisabled(false);
+    $('go').textContent = '▶ Probar';
+    if (kind === 'win') { won(); return; }
+    if (kind === 'wall') setStatus('✗ ¡Casi! Ahí hay un muro 🧱.', 'ko');
+    else if (kind === 'edge') setStatus('✗ ¡Casi! Ahí acaba el tablero.', 'ko');
+    else {
+      markAt(st.x, st.y);
+      cells[st.x + ',' + st.y].classList.add('is-hit');
+      Kit.sfx('ko');
+      const atStar = st.x === g.star.x && st.y === g.star.y;
+      if (atStar && st.mask !== allMask(g)) setStatus('✗ ¡Casi! Faltan 💎 por recoger.', 'ko');
+      else setStatus('✗ ¡Casi! Aquí acaba el programa.', 'ko');
+    }
+  }
+
+  function won() {
+    const c = progCost();
+    const n = starsFor(c, lv.par);
+    const cur = loadStars();
+    cur[lv.n] = Math.max(Number(cur[lv.n]) || 0, n);
+    store.set({ lv: cur });
+    cells[st.x + ',' + st.y].classList.add('is-win');
+    robotEl.classList.add('is-win');
+    Kit.sfx('ok');
+    const praise = Kit.praise();
+    setStatus('✓ ' + praise, 'ok');
+    Kit.speak(praise, 'es');
+    const level = lv.n;
+    setTimeout(() => {
+      if (!lv || lv.n !== level || $('play').hidden) return;
+      const hasNext = DATA.some((l) => l.n === level + 1);
+      const extra = document.createElement('div');
+      extra.style.fontSize = '48px';
+      extra.setAttribute('aria-hidden', 'true');
+      extra.textContent = '🤖⭐';
+      const actions = hasNext ? [{ label: 'Siguiente nivel', primary: true, onClick: () => loadLevel(level + 1) }] : [];
+      // Kit.result turns score/total into stars: 10/10 = 3, 7/10 = 2, 1/10 = 1.
+      Kit.result({
+        slug: SLUG, score: n === 3 ? 10 : n === 2 ? 7 : 1, total: 10,
+        message: hasNext ? '¡Nivel ' + level + ' superado!' : '¡Has superado los 20 niveles!',
+        extra, actions,
+        onAgain: () => loadLevel(level)
+      });
+      const p = document.querySelector('.k-overlay .k-result p');
+      if (p) p.textContent = n === 3 ? 'Programa perfecto: ' + c + (c === 1 ? ' orden' : ' órdenes') + '.'
+        : 'Has usado ' + c + ' órdenes. Con ' + lv.par + ' ganas 3 estrellas.';
+    }, 900);
+  }
+
+  /* ---------- wiring ---------- */
+
+  const cmds = $('cmds');
+  ORDER.forEach((d) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cmd';
+    b.textContent = DIRS[d].glyph;
+    b.setAttribute('aria-label', 'Añadir ' + DIRS[d].name);
+    b.addEventListener('click', () => addDir(d));
+    cmds.appendChild(b);
+  });
+  const repBtn = document.createElement('button');
+  repBtn.type = 'button';
+  repBtn.id = 'rep';
+  repBtn.className = 'cmd rep-btn';
+  repBtn.hidden = true;
+  repBtn.addEventListener('click', toggleRepeat);
+  cmds.appendChild(repBtn);
+  $('go').addEventListener('click', run);
+  $('clear').addEventListener('click', clearAll);
+  $('back').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+  $('say').addEventListener('click', () => { if (lv) Kit.speak(plainSpeech(spoken()), 'es'); });
+
+  // Physical keyboard: arrow keys add commands, Backspace removes the last one, Enter runs.
+  document.addEventListener('keydown', (e) => {
+    if ($('play').hidden || document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    const map = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R' };
+    if (map[e.key]) { e.preventDefault(); addDir(map[e.key]); }
+    else if (e.key === 'Backspace' && !running) {
+      e.preventDefault();
+      if (open >= 0 && prog[open] && prog[open].body.length) removeBody(open, prog[open].body.length - 1);
+      else if (prog.length) {
+        const last = prog.length - 1;
+        if (prog[last].k === 'r' && prog[last].body.length) removeBody(last, prog[last].body.length - 1);
+        else removeTop(last);
+      }
+    } else if (e.key === 'Enter' && !(e.target && e.target.tagName === 'BUTTON')) { e.preventDefault(); run(); }
+  });
+
+  Kit.mount({ slug: SLUG, title: 'Robot explorador' });
+  showStart();
+})();
+</script>
+</body>
+</html>

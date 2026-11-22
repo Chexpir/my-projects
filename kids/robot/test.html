@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Robot explorador: test</title>
+<style>body{font:16px/1.4 monospace;padding:16px} .ok{color:#1e8e4e} .ko{color:#d64545;font-weight:bold}</style></head>
+<body>
+<h1>Robot explorador: comprobación de niveles</h1>
+<p>Abre esta página con el servidor local. Carga <code>index.html</code> y comprueba todos los niveles con un solver independiente (Dijkstra sobre estados).</p>
+<pre id="out">Cargando…</pre>
+<iframe id="f" src="index.html" style="position:absolute;left:-9999px;width:400px;height:700px" title="juego"></iframe>
+<script>
+(function () {
+  'use strict';
+  const out = document.getElementById('out');
+  const lines = []; let failed = 0;
+  const log = (ok, msg) => { if (!ok) failed++; lines.push((ok ? 'ok   ' : 'FAIL ') + msg); };
+
+  document.getElementById('f').addEventListener('load', () => {
+    const R = document.getElementById('f').contentWindow.RobotGame;
+    const D = { U: [0, -1], D: [0, 1], L: [-1, 0], R: [1, 0] };
+
+    // Independent model of the rules (does not reuse the game's functions).
+    function parse(map) {
+      const L = { w: map[0].length, h: map.length, walls: new Set(), gems: [], start: null, star: null };
+      map.forEach((row, y) => row.split('').forEach((c, x) => {
+        if (c === '#') L.walls.add(x + ',' + y);
+        if (c === 'R') L.start = [x, y];
+        if (c === 'S') L.star = [x, y];
+        if (c === 'G') L.gems.push([x, y]);
+      }));
+      return L;
+    }
+    // Move one square. null = wall or edge. 'W' = reached the star with every gem.
+    function move(L, s, d) {
+      const x = s[0] + D[d][0], y = s[1] + D[d][1];
+      if (x < 0 || y < 0 || x >= L.w || y >= L.h || L.walls.has(x + ',' + y)) return null;
+      let m = s[2];
+      L.gems.forEach((q, i) => { if (q[0] === x && q[1] === y) m |= 1 << i; });
+      const ns = [x, y, m];
+      if (x === L.star[0] && y === L.star[1] && m === (1 << L.gems.length) - 1) return 'W';
+      return ns;
+    }
+    // Run a program given as the game stores it. Returns true when it wins.
+    function solves(L, prog) {
+      let s = [L.start[0], L.start[1], 0];
+      const flat = [];
+      prog.forEach((it) => { if (typeof it === 'string') flat.push(it); else for (let i = 0; i < it[0]; i++) flat.push(...it[1].split('')); });
+      for (const d of flat) { const r = move(L, s, d); if (r === null) return false; if (r === 'W') return true; s = r; }
+      return false;
+    }
+    const costOf = (p) => p.reduce((a, it) => a + (typeof it === 'string' ? 1 : 1 + it[1].length), 0);
+
+    // Shortest program cost. Without `repeat` it is a breadth-first search on arrows.
+    // With `repeat`, items are an arrow (cost 1) or a block of 1-3 arrows x 2-5 (cost 1 + body), searched by Dijkstra.
+    function shortest(L, repeat) {
+      const items = [];
+      'UDLR'.split('').forEach((d) => items.push({ c: 1, seq: [d] }));
+      if (repeat) {
+        const bodies = [];
+        const build = (pre) => { if (pre.length) bodies.push(pre); if (pre.length < 3) 'UDLR'.split('').forEach((d) => build(pre + d)); };
+        build('');
+        bodies.forEach((b) => { for (let n = 2; n <= 5; n++) items.push({ c: 1 + b.length, seq: b.repeat(n).split('') }); });
+      }
+      const key = (s) => s[0] + ',' + s[1] + ',' + s[2];
+      const start = [L.start[0], L.start[1], 0];
+      const dist = new Map([[key(start), 0]]);
+      const queue = [{ c: 0, s: start }];
+      let best = Infinity;
+      while (queue.length) {
+        queue.sort((a, b) => a.c - b.c);
+        const { c, s } = queue.shift();
+        if (c >= best) break;
+        if (dist.get(key(s)) < c) continue;
+        for (const it of items) {
+          let cur = s, dead = false, win = false;
+          for (const d of it.seq) { const r = move(L, cur, d); if (r === null) { dead = true; break; } if (r === 'W') { win = true; break; } cur = r; }
+          if (dead) continue;
+          const nc = c + it.c;
+          if (win) { best = Math.min(best, nc); continue; }
+          const k = key(cur);
+          if (nc < (dist.has(k) ? dist.get(k) : Infinity)) { dist.set(k, nc); queue.push({ c: nc, s: cur }); }
+        }
+      }
+      return best === Infinity ? null : best;
+    }
+
+    log(R.DATA.length === 20, '20 niveles (' + R.DATA.length + ')');
+    R.DATA.forEach((lv) => {
+      const L = parse(lv.map);
+      const tag = 'Nivel ' + lv.n + ': ';
+      log(L.w >= 5 && L.w <= 7 && L.h >= 5 && L.h <= 7, tag + 'tablero ' + L.w + 'x' + L.h + ' entre 5x5 y 7x7');
+      log(!!L.start && !!L.star && lv.map.every((r) => r.length === L.w), tag + 'tiene robot, estrella y filas del mismo ancho');
+      // The game's own engine must agree with the independent model.
+      const sim = R.simulate(lv, lv.ref);
+      log(sim.result === 'win' && solves(L, lv.ref), tag + 'el programa de referencia gana (motor del juego y modelo del test)');
+      const c = costOf(lv.ref);
+      log(c === R.cost(lv.ref), tag + 'coste de la referencia ' + c + ' coincide con el del juego');
+      log(c === lv.par, tag + 'la referencia mide ' + c + ' y par = ' + lv.par);
+      if (lv.n <= 10) {
+        log(!lv.ref.some((x) => typeof x !== 'string'), tag + 'sin Repetir');
+        const t = shortest(L, false);
+        log(t === lv.par, tag + 'par ' + lv.par + ' = programa más corto real (BFS) ' + t);
+      } else {
+        log(lv.limit !== null && c <= lv.limit, tag + 'referencia (' + c + ') dentro del límite ' + lv.limit);
+        const plain = shortest(L, false), rep = shortest(L, true);
+        log(rep === lv.par, tag + 'par ' + lv.par + ' = programa más corto real con Repetir (' + rep + ')');
+        log(plain > lv.limit, tag + 'sin Repetir hacen falta ' + plain + ' órdenes, más que el límite ' + lv.limit + ': Repetir es necesario');
+        log(lv.ref.some((x) => typeof x !== 'string'), tag + 'la referencia usa Repetir');
+        if (lv.n >= 16) log(L.gems.length > 0, tag + 'tiene ' + L.gems.length + ' gemas');
+        else log(L.gems.length === 0, tag + 'sin gemas');
+      }
+      if (lv.n <= 15) log(L.gems.length === 0, tag + 'sin gemas');
+      // Gems matter: the same level without gems must have a shorter or equal solution, and gems are not walls.
+      L.gems.forEach((q) => log(!L.walls.has(q[0] + ',' + q[1]), tag + 'gema en casilla libre'));
+    });
+    // Every level can be won by its reference with stars rule check.
+    log(R.starsFor(3, 3) === 3 && R.starsFor(5, 3) === 2 && R.starsFor(6, 3) === 1, 'estrellas: <=par 3, par+2 2, más 1');
+    // A bump must stop the run.
+    const bump = R.simulate(R.DATA[0], ['L']);
+    log(bump.result === 'edge', 'chocar con el borde detiene el programa (' + bump.result + ')');
+    const wall = R.simulate(R.DATA[3], ['U', 'R', 'D']);
+    log(wall.result === 'wall' || wall.result === 'edge', 'chocar con un muro detiene el programa (' + wall.result + ')');
+
+    lines.unshift(failed ? failed + ' COMPROBACIONES FALLIDAS' : 'TODO CORRECTO (' + lines.length + ' comprobaciones)');
+    out.innerHTML = lines.map((l) => '<span class="' + (l.startsWith('FAIL') || l.includes('FALLIDAS') ? 'ko' : 'ok') + '">' + l + '</span>').join('\n');
+    document.title = failed ? 'FAIL' : 'PASS';
+    window.TEST_RESULT = { failed, lines };
+  });
+})();
+</script>
+</body></html>

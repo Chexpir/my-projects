@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="La tienda: paga con monedas y billetes de euro y da el cambio.">
+<meta name="theme-color" content="#fff8ec">
+<title>La tienda</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  /* ---------- level menu ---------- */
+  .menu { display: flex; flex-direction: column; gap: 8px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0 0 4px; text-align: center; color: var(--muted); font-weight: 700; }
+  .lvl {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 6px 14px;
+    text-align: left; border: 3px solid var(--accent); border-radius: var(--radius);
+    background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--accent); cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  }
+  .lvl:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lvl:disabled { border-color: var(--line); box-shadow: none; background: #efeae0; color: var(--muted); cursor: not-allowed; }
+  .lvl__n { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+            display: grid; place-items: center; font-size: 24px; font-weight: 900; }
+  .lvl:disabled .lvl__n { background: #cfc6b4; color: #fff; }
+  .lvl__t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .lvl__name { font-size: 22px; font-weight: 900; line-height: 1.15; }
+  .lvl__sub { font-size: 20px; font-weight: 600; color: var(--muted); line-height: 1.2; }
+  .lvl__side { flex: none; font-size: 26px; }
+  .unlock { font-size: 22px; font-weight: 800; color: var(--ok); margin: 0; }
+
+  /* ---------- play screen ---------- */
+  .play { --u: 2.6; flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  @media (max-height: 700px) { .play { --u: 2.2; } }
+  @media (min-width: 700px) and (min-height: 820px) { .play { --u: 3.2; } }
+  .play-top { display: flex; align-items: center; gap: 10px; }
+  .play-top .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .play-top .k-progress { flex: 1; gap: 6px; flex-wrap: nowrap; }
+  .play-top .k-progress > i { width: 16px; height: 16px; border-width: 3px; flex: none; }
+  @media (max-width: 400px) { .play-top .k-progress { gap: 4px; } .play-top .k-progress > i { width: 14px; height: 14px; } .play-top .k-btn { padding: 0 12px; } }
+
+  .item { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 72px 8px 12px; }
+  .item.is-change { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "e n" "r r"; grid-template-rows: 56px auto; gap: 4px 12px; padding: 8px 12px; }
+  .item.is-change .item__txt { display: contents; }
+  .item.is-change .item__emoji { grid-area: e; }
+  .item.is-change .item__name { grid-area: n; align-self: center; margin-right: 64px; }
+  .item.is-change .item__row { grid-area: r; justify-content: space-between; flex-wrap: nowrap; }
+  .item__emoji { flex: none; font-size: 46px; line-height: 1; }
+  .item__txt { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .item__name { font-size: 20px; font-weight: 800; line-height: 1.15; }
+  .item__row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+  .item__price { font-size: 30px; font-weight: 900; line-height: 1.1; white-space: nowrap; }
+  .item__pay { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; white-space: nowrap; }
+  .say {
+    position: absolute; top: 8px; right: 8px; z-index: 2; min-width: 56px; min-height: 56px; border-radius: 50%;
+    border: 2px solid var(--line); background: var(--card); font-size: 26px; cursor: pointer; touch-action: manipulation;
+  }
+
+  .counter { flex: 1; min-height: 80px; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; overflow-y: auto; }
+  .counter.is-ok { border-color: var(--ok); background: var(--ok-bg); box-shadow: 0 4px 0 var(--ok); }
+  .counter.is-ko { border-color: var(--ko); background: var(--ko-bg); box-shadow: 0 4px 0 var(--ko); }
+  .ct-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-weight: 800; }
+  .ct-label { font-size: 20px; color: var(--muted); }
+  .ct-total { font-size: 26px; font-weight: 900; white-space: nowrap; text-align: right; }
+  .ct-total.is-hidden { font-size: 20px; font-weight: 800; color: var(--muted); }
+  .ct-items { flex: 1; display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: center; gap: 8px; }
+  @media (max-height: 700px) { .ct-items { --u: 1.9; } }
+  .ct-empty { align-self: center; color: var(--muted); font-size: 20px; font-weight: 700; text-align: center; }
+
+  .dock { display: grid; }
+  .dock > * { grid-area: 1 / 1; }
+  .dock > .off { visibility: hidden; pointer-events: none; }
+  .controls { display: flex; flex-direction: column; gap: 8px; }
+  .purse { padding: 4px 2px; }
+  .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .k-app.is-playing { height: 100vh; height: 100dvh; }
+  .purse-items { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .actions { display: flex; gap: 8px; }
+  .actions .k-btn { flex: 1; }
+  .actions .k-btn--big { min-height: 60px; flex: 2; }
+
+  /* tap targets that hold a coin or a note */
+  .pc {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    min-width: 56px; min-height: 56px; padding: 2px; border: 2px solid var(--line); border-radius: 14px;
+    background: #fff; cursor: pointer; box-shadow: 0 3px 0 var(--line);
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .pc:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+  .pc .badge {
+    position: absolute; right: -8px; top: -8px; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px;
+    background: var(--ink); color: #fff; font-size: 20px; font-weight: 900; line-height: 28px; text-align: center;
+  }
+
+  /* ---------- coins and notes, drawn with CSS ---------- */
+  .coin, .note { --d: 20; display: inline-flex; align-items: center; justify-content: center; flex: none; color: #3b2a12; font-weight: 900; }
+  .coin {
+    width: calc(var(--u) * var(--d) * 1px); height: calc(var(--u) * var(--d) * 1px);
+    border-radius: 50%; border: 2px solid rgba(0, 0, 0, .35); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .35);
+    font-size: calc(var(--u) * var(--d) * .4px); line-height: 1;
+  }
+  .coin .tx { display: flex; flex-direction: column; align-items: center; }
+  .coin small { font-size: calc(var(--u) * var(--d) * .22px); font-weight: 800; margin-top: 1px; }
+  .coin.cu { background: radial-gradient(circle at 35% 30%, #efb08a, #c9713f 55%, #a85a30); color: #4a2008; }
+  .coin.au { background: radial-gradient(circle at 35% 30%, #f7e6a0, #dcb64e 60%, #b98d2a); color: #4f3a05; }
+  .coin.bi { color: #3b2a12; }
+  .coin.bi .in {
+    width: 66%; height: 66%; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    border: 2px solid rgba(0, 0, 0, .3); font-size: calc(var(--u) * var(--d) * .3px);
+  }
+  .coin.bi .tx { flex-direction: row; align-items: baseline; gap: 1px; }
+  .coin.bi small { font-size: calc(var(--u) * var(--d) * .15px); margin: 0; }
+  .coin.b1 { background: radial-gradient(circle at 35% 30%, #f7e6a0, #dcb64e 60%, #b98d2a); }
+  .coin.b1 .in { background: radial-gradient(circle at 35% 30%, #f4f6f8, #c7ced6 60%, #98a1ab); }
+  .coin.b2 { background: radial-gradient(circle at 35% 30%, #f4f6f8, #c7ced6 60%, #98a1ab); }
+  .coin.b2 .in { background: radial-gradient(circle at 35% 30%, #f7e6a0, #dcb64e 60%, #b98d2a); }
+
+  .note {
+    width: calc(var(--u) * .33 * var(--w) * 1px); height: calc(var(--u) * .33 * var(--h) * 1px);
+    border-radius: 6px; border: 2px solid rgba(0, 0, 0, .35); position: relative; overflow: hidden;
+    font-size: calc(var(--u) * .33 * var(--h) * .6px); line-height: 1; color: #1f2933;
+  }
+  .note::before { content: ""; position: absolute; top: 0; bottom: 0; right: 14%; width: 12%; background: rgba(255, 255, 255, .45); }
+  .note::after { content: "EURO"; position: absolute; left: 6px; bottom: 2px; font-size: calc(var(--u) * .33 * var(--h) * .2px); font-weight: 800; letter-spacing: .5px; }
+  .note b { position: relative; z-index: 1; display: flex; align-items: baseline; gap: 2px; margin-left: 8%; }
+  .note small { font-size: .5em; font-weight: 900; }
+  .note.n5 { background: linear-gradient(135deg, #cfd6d2, #9fb0a8 55%, #b8c4bd); }
+  .note.n10 { background: linear-gradient(135deg, #f6b3b8, #e4707c 55%, #ee9aa2); }
+
+  .mini { --u: 1.6; }
+  .mini .coin, .mini .note { box-shadow: none; }
+
+  /* ---------- feedback ---------- */
+  .fb { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+  .fb__title { font-size: 28px; font-weight: 900; line-height: 1.1; }
+  .fb__title.is-ok { color: var(--ok); }
+  .fb__title.is-ko { color: var(--ko); }
+  .fb__line { font-size: 20px; font-weight: 800; line-height: 1.2; }
+  .fb__diff { font-size: 22px; font-weight: 900; line-height: 1.15; }
+  .fb__sol { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; font-size: 20px; font-weight: 800; }
+  .fb__sol .lead { color: var(--muted); }
+  .fb__sol .g { display: inline-flex; align-items: center; gap: 4px; }
+  .fb .k-btn { margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir nivel">
+    <div class="menu">
+      <h2>¡Elige tu nivel!</h2>
+      <div id="levels" class="menu"></div>
+      <p>🔒 Gana 2 estrellas en un nivel para abrir el siguiente.</p>
+    </div>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="play-top">
+      <button type="button" class="k-btn k-btn--ghost" id="quit" aria-label="Volver a los niveles">‹ Niveles</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+
+    <div class="k-card item" id="item">
+      <span class="item__emoji" id="i-emoji" aria-hidden="true"></span>
+      <div class="item__txt">
+        <div class="item__name" id="i-name"></div>
+        <div class="item__row">
+          <span class="item__price" id="i-price"></span>
+          <span class="item__pay" id="i-pay" hidden></span>
+        </div>
+      </div>
+      <button type="button" class="say" id="say" aria-label="Escuchar la pregunta">🔊</button>
+    </div>
+
+    <div class="k-card counter" id="counter" aria-label="Mostrador">
+      <div class="ct-head" id="ct-head">
+        <span class="ct-label" id="ct-label">En el mostrador</span>
+        <span class="ct-total" id="total" role="status" aria-live="polite"></span>
+      </div>
+      <div class="ct-items" id="ct-items"></div>
+    </div>
+
+    <div class="dock">
+      <div class="controls" id="controls">
+        <div class="k-card purse">
+          <span class="sr" id="purse-label">Tu monedero</span>
+          <div class="purse-items" id="purse" role="group" aria-labelledby="purse-label"></div>
+        </div>
+        <div class="actions">
+          <button type="button" class="k-btn k-btn--ghost" id="clear">Vaciar</button>
+          <button type="button" class="k-btn k-btn--big" id="pay" disabled>Pagar</button>
+        </div>
+      </div>
+      <div class="fb off" id="fb" role="status" aria-live="polite">
+        <div class="fb__title" id="fb-title"></div>
+        <div class="fb__line" id="fb-line"></div>
+        <div class="fb__diff" id="fb-diff"></div>
+        <div class="fb__sol" id="fb-sol"></div>
+        <button type="button" class="k-btn k-btn--big" id="next">Siguiente</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: pieces, products and levels (edit here) ===== */
+  const SLUG = 'la-tienda';
+  const ROUND = 10;
+  const MAX_PIECES = 60; // most pieces that fit on the counter
+
+  // All amounts are whole céntimos. `d` = diameter in mm; notes have `w` and `h` in mm (real sizes).
+  const PIECES = [
+    { v: 1,    kind: 'coin', cls: 'cu', d: 16.25, txt: '1',  sub: 'cts', name: 'moneda de 1 céntimo',    say: 'un céntimo' },
+    { v: 2,    kind: 'coin', cls: 'cu', d: 18.75, txt: '2',  sub: 'cts', name: 'moneda de 2 céntimos',   say: 'dos céntimos' },
+    { v: 5,    kind: 'coin', cls: 'cu', d: 21.25, txt: '5',  sub: 'cts', name: 'moneda de 5 céntimos',   say: 'cinco céntimos' },
+    { v: 10,   kind: 'coin', cls: 'au', d: 19.75, txt: '10', sub: 'cts', name: 'moneda de 10 céntimos',  say: 'diez céntimos' },
+    { v: 20,   kind: 'coin', cls: 'au', d: 22.25, txt: '20', sub: 'cts', name: 'moneda de 20 céntimos',  say: 'veinte céntimos' },
+    { v: 50,   kind: 'coin', cls: 'au', d: 24.25, txt: '50', sub: 'cts', name: 'moneda de 50 céntimos',  say: 'cincuenta céntimos' },
+    { v: 100,  kind: 'coin', cls: 'bi b1', d: 23.25, txt: '1', sub: '€', name: 'moneda de 1 euro',       say: 'un euro' },
+    { v: 200,  kind: 'coin', cls: 'bi b2', d: 25.75, txt: '2', sub: '€', name: 'moneda de 2 euros',      say: 'dos euros' },
+    { v: 500,  kind: 'note', cls: 'n5',  w: 120, h: 62, txt: '5',  name: 'billete de 5 euros',  say: 'un billete de cinco euros' },
+    { v: 1000, kind: 'note', cls: 'n10', w: 127, h: 67, txt: '10', name: 'billete de 10 euros', say: 'un billete de diez euros' }
+  ];
+
+  // Realistic prices for a child. `p` is in céntimos.
+  const PRODUCTS = [
+    // up to 50 cts
+    { e: '🍬', n: 'Un chicle', p: 5 },
+    { e: '🧽', n: 'Una goma', p: 12 },
+    { e: '🍊', n: 'Una mandarina', p: 15 },
+    { e: '🍪', n: 'Una galleta', p: 20 },
+    { e: '🍋', n: 'Un limón', p: 22 },
+    { e: '🍭', n: 'Una piruleta', p: 25 },
+    { e: '🎈', n: 'Un globo', p: 30 },
+    { e: '🍎', n: 'Una manzana', p: 35 },
+    { e: '🍌', n: 'Un plátano', p: 40 },
+    { e: '✏️', n: 'Un lápiz', p: 45 },
+    { e: '🍒', n: 'Unas cerezas', p: 47 },
+    { e: '🍫', n: 'Un bombón', p: 50 },
+    // 51 cts to 2 €
+    { e: '🧁', n: 'Una magdalena', p: 65 },
+    { e: '🥖', n: 'Una barra de pan', p: 85 },
+    { e: '🖊️', n: 'Un bolígrafo', p: 95 },
+    { e: '🌟', n: 'Un sobre de cromos', p: 100 },
+    { e: '🥛', n: 'Un batido', p: 110 },
+    { e: '🍩', n: 'Un donut', p: 120 },
+    { e: '🍉', n: 'Una rodaja de sandía', p: 125 },
+    { e: '🧃', n: 'Un zumo', p: 135 },
+    { e: '🥐', n: 'Un cruasán', p: 140 },
+    { e: '🍦', n: 'Un helado', p: 150 },
+    { e: '🧴', n: 'Un pegamento', p: 175 },
+    { e: '🍇', n: 'Un racimo de uvas', p: 180 },
+    { e: '🍿', n: 'Unas palomitas', p: 190 },
+    { e: '🍕', n: 'Una porción de pizza', p: 195 },
+    // 2 € to 10 €
+    { e: '🪀', n: 'Un yoyó', p: 230 },
+    { e: '🥪', n: 'Un bocadillo', p: 250 },
+    { e: '🌈', n: 'Pegatinas de colores', p: 275 },
+    { e: '✂️', n: 'Unas tijeras', p: 280 },
+    { e: '📓', n: 'Un cuaderno', p: 320 },
+    { e: '🍰', n: 'Un trozo de tarta', p: 360 },
+    { e: '🍕', n: 'Una pizza pequeña', p: 450 },
+    { e: '🎨', n: 'Una caja de pinturas', p: 495 },
+    { e: '🎒', n: 'Un estuche', p: 560 },
+    { e: '🪁', n: 'Una cometa', p: 640 },
+    { e: '📚', n: 'Un libro de cuentos', p: 695 },
+    { e: '🧸', n: 'Un osito de peluche', p: 790 },
+    { e: '🧩', n: 'Un puzle', p: 850 },
+    { e: '⚽', n: 'Un balón', p: 900 }
+  ];
+
+  // `min`/`max`: price range practised (céntimos); `denoms`: the pieces in the purse;
+  // `showTotal`: show the running total; `change`: the customer pays with a big piece.
+  const LEVELS = [
+    { n: 1, name: 'Céntimos',   sub: 'Hasta 50 cts, con monedas',        min: 1,   max: 50,   denoms: [1, 2, 5, 10, 20, 50],                         showTotal: true,  change: false },
+    { n: 2, name: 'Monedas',    sub: 'Hasta 2 €, con todas las monedas', min: 51,  max: 200,  denoms: [1, 2, 5, 10, 20, 50, 100, 200],               showTotal: true,  change: false },
+    { n: 3, name: 'Billetes',   sub: 'Hasta 10 €, con monedas y billetes', min: 201, max: 1000, denoms: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000], showTotal: false, change: false },
+    { n: 4, name: 'El cambio',  sub: 'Da el cambio al cliente',          min: 20,  max: 995,  denoms: [1, 2, 5, 10, 20, 50, 100, 200, 500],          showTotal: false, change: true,
+      pays: [200, 500, 1000] }
+  ];
+  /* ===== end DATA ===== */
+
+  const $ = (id) => document.getElementById(id);
+  const PIECE = {};
+  PIECES.forEach((p) => { PIECE[p.v] = p; });
+
+  /* ---------- money maths (whole céntimos only) ---------- */
+
+  const pad2 = (n) => (n < 10 ? '0' : '') + n;
+  // 135 -> "1,35 €", 45 -> "45 cts", 200 -> "2,00 €".
+  function fmt(c) {
+    return c < 100 ? c + ' cts' : Math.floor(c / 100) + ',' + pad2(c % 100) + ' €';
+  }
+  // Counts is an object { value: howMany }.
+  function totalOf(counts) {
+    let t = 0;
+    for (const k in counts) t += Number(k) * counts[k];
+    return t;
+  }
+  // Fewest pieces for `amount` using only `denoms` (exact dynamic programming, not greedy).
+  const fewestCache = {};
+  function fewest(amount, denoms) {
+    const key = denoms.join(',');
+    let best = fewestCache[key];
+    if (!best) {
+      best = fewestCache[key] = { n: [0], last: [0] };
+    }
+    for (let a = best.n.length; a <= amount; a++) {
+      let bn = Infinity, bl = 0;
+      for (const d of denoms) {
+        if (d <= a && best.n[a - d] + 1 < bn) { bn = best.n[a - d] + 1; bl = d; }
+      }
+      best.n[a] = bn; best.last[a] = bl;
+    }
+    const out = {};
+    let a = amount;
+    if (!isFinite(best.n[a])) return null;
+    while (a > 0) { const d = best.last[a]; out[d] = (out[d] || 0) + 1; a -= d; }
+    return out;
+  }
+  const countPieces = (counts) => { let n = 0; for (const k in counts) n += counts[k]; return n; };
+
+  /* ---------- Spanish words for amounts (for the 🔊 button) ---------- */
+
+  const ONES = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce', 'trece',
+    'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve', 'veinte', 'veintiuno', 'veintidós', 'veintitrés',
+    'veinticuatro', 'veinticinco', 'veintiséis', 'veintisiete', 'veintiocho', 'veintinueve'];
+  const TENS = { 3: 'treinta', 4: 'cuarenta', 5: 'cincuenta', 6: 'sesenta', 7: 'setenta', 8: 'ochenta', 9: 'noventa' };
+  function words(n) { // 0 to 99, "un" before a noun
+    let w = n < 30 ? ONES[n] : TENS[Math.floor(n / 10)] + (n % 10 ? ' y ' + ONES[n % 10] : '');
+    if (n % 10 === 1 && n !== 11) w = w.replace(/uno$/, 'un').replace(/veintiun$/, 'veintiún');
+    return w;
+  }
+  function spoken(c) {
+    const e = Math.floor(c / 100), cs = c % 100, parts = [];
+    if (e > 0) parts.push(words(e) + (e === 1 ? ' euro' : ' euros'));
+    if (cs > 0 || e === 0) parts.push(words(cs) + (cs === 1 ? ' céntimo' : ' céntimos'));
+    return parts.join(' con ');
+  }
+
+  /* ---------- drawing coins and notes ---------- */
+
+  function pieceVisual(pc) {
+    const s = document.createElement('span');
+    s.setAttribute('aria-hidden', 'true');
+    if (pc.kind === 'coin') {
+      s.className = 'coin ' + pc.cls;
+      s.style.setProperty('--d', pc.d);
+      const tx = '<span class="tx"><span>' + pc.txt + '</span><small>' + pc.sub + '</small></span>';
+      s.innerHTML = pc.cls.indexOf('bi') >= 0 ? '<span class="in">' + tx + '</span>' : tx;
+    } else {
+      s.className = 'note ' + pc.cls;
+      s.style.setProperty('--w', pc.w);
+      s.style.setProperty('--h', pc.h);
+      s.innerHTML = '<b>' + pc.txt + '<small>€</small></b>';
+    }
+    return s;
+  }
+
+  /* ---------- question generation ---------- */
+
+  function choosePay(price, level) {
+    const bigger = level.pays.filter((x) => x > price);
+    const good = bigger.filter((x) => price * 5 >= x);
+    const pool = good.length ? good : [bigger[0]];
+    return Kit.sample(pool, 1)[0];
+  }
+
+  function makeItem(level, prod) {
+    const it = { prod, price: prod.p, pay: 0, target: prod.p };
+    if (level.change) {
+      it.pay = choosePay(prod.p, level);
+      it.target = it.pay - prod.p;
+    }
+    it.solution = fewest(it.target, level.denoms);
+    return it;
+  }
+
+  function makeRound(levelN, n = ROUND) {
+    const L = LEVELS[levelN - 1];
+    const pref = PRODUCTS.filter((p) => p.p >= L.min && p.p <= L.max);
+    const rest = PRODUCTS.filter((p) => p.p < L.min && p.p <= L.max);
+    const picks = Kit.shuffle(pref).concat(Kit.shuffle(rest)).slice(0, n);
+    return Kit.shuffle(picks).map((p) => makeItem(L, p));
+  }
+
+  /* ---------- state ---------- */
+
+  const store = Kit.store(SLUG);
+  const load = () => store.get({ unlocked: 1, best: {} });
+  function isOpen(lv, s) { return lv === 1 || lv <= s.unlocked || (s.best[lv - 1] || 0) >= 2; }
+
+  let level = 1, queue = [], pos = 0, score = 0, results = [], mode = 'idle'; // idle | answering | feedback
+  let counts = {};
+
+  const el = { start: $('start'), play: $('play'), counter: $('counter'), items: $('ct-items'), total: $('total'),
+               purse: $('purse'), fb: $('fb'), controls: $('controls'), dots: $('dots'), pay: $('pay') };
+
+  /* ---------- start screen ---------- */
+
+  function showStart() {
+    mode = 'idle';
+    el.play.hidden = true;
+    el.start.hidden = false;
+    document.querySelector('.k-app').classList.remove('is-playing');
+    const s = load();
+    const box = $('levels');
+    box.textContent = '';
+    LEVELS.forEach((L) => {
+      const open = isOpen(L.n, s);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lvl';
+      b.disabled = !open;
+      b.dataset.level = L.n;
+      b.innerHTML = '<span class="lvl__n"></span><span class="lvl__t"><span class="lvl__name"></span><span class="lvl__sub"></span></span><span class="lvl__side"></span>';
+      b.querySelector('.lvl__n').textContent = L.n;
+      b.querySelector('.lvl__name').textContent = L.name;
+      b.querySelector('.lvl__sub').textContent = L.sub;
+      const side = b.querySelector('.lvl__side');
+      if (open) side.appendChild(Kit.stars.el(s.best[L.n] || 0, 3));
+      else { side.textContent = '🔒'; side.setAttribute('role', 'img'); side.setAttribute('aria-label', 'Bloqueado'); }
+      b.addEventListener('click', () => { Kit.sfx('tap'); startRound(L.n); });
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- round ---------- */
+
+  function startRound(n) {
+    level = n;
+    queue = makeRound(n).map((item, i) => ({ item, orig: i, rep: false }));
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    el.start.hidden = true;
+    el.play.hidden = false;
+    document.querySelector('.k-app').classList.add('is-playing');
+    buildPurse();
+    showQuestion();
+  }
+
+  function renderDots() {
+    el.dots.textContent = '';
+    const cur = queue[pos];
+    results.forEach((r, i) => {
+      const d = document.createElement('i');
+      if (r === true) d.className = 'is-done';
+      else if (r === false) d.className = 'is-miss';
+      if (cur && !cur.rep && cur.orig === i) d.classList.add('is-current');
+      el.dots.appendChild(d);
+    });
+  }
+
+  function setPhase(answering) {
+    el.fb.classList.toggle('off', answering);
+    el.controls.classList.toggle('off', !answering);
+    el.fb.inert = answering;
+    el.controls.inert = !answering;
+    el.counter.inert = !answering;
+  }
+
+  function buildPurse() {
+    const L = LEVELS[level - 1];
+    el.purse.textContent = '';
+    L.denoms.forEach((v) => {
+      const pc = PIECE[v];
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pc';
+      b.dataset.v = v;
+      b.setAttribute('aria-label', 'Poner ' + pc.name);
+      b.appendChild(pieceVisual(pc));
+      b.addEventListener('click', () => add(v));
+      el.purse.appendChild(b);
+    });
+    $('purse-label').textContent = L.change ? 'La caja' : 'Tu monedero';
+    $('ct-label').textContent = L.change ? 'Tu cambio' : 'En el mostrador';
+  }
+
+  function showQuestion() {
+    mode = 'answering';
+    const L = LEVELS[level - 1];
+    const it = queue[pos].item;
+    counts = {};
+    renderDots();
+    $('i-emoji').textContent = it.prod.e;
+    $('i-name').textContent = it.prod.n;
+    $('i-price').textContent = fmt(it.price);
+    const payEl = $('i-pay');
+    $('item').classList.toggle('is-change', L.change);
+    payEl.hidden = !L.change;
+    payEl.textContent = '';
+    if (L.change) {
+      payEl.appendChild(document.createTextNode('Paga con'));
+      const wrap = document.createElement('span');
+      wrap.className = 'mini';
+      wrap.setAttribute('role', 'img');
+      wrap.setAttribute('aria-label', PIECE[it.pay].name);
+      wrap.appendChild(pieceVisual(PIECE[it.pay]));
+      payEl.appendChild(wrap);
+    }
+    el.counter.className = 'k-card counter';
+    renderCounter();
+    setPhase(true);
+  }
+
+  /* ---------- the counter ---------- */
+
+  function renderCounter(focusV) {
+    const L = LEVELS[level - 1];
+    const sum = totalOf(counts);
+    el.items.textContent = '';
+    const vals = Object.keys(counts).map(Number).sort((a, b) => b - a);
+    if (!vals.length) {
+      const e = document.createElement('div');
+      e.className = 'ct-empty';
+      e.textContent = L.change ? 'Toca las monedas y billetes de la caja' : 'Toca las monedas y billetes del monedero';
+      el.items.appendChild(e);
+    }
+    vals.forEach((v) => {
+      const pc = PIECE[v], n = counts[v];
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pc';
+      b.dataset.v = v;
+      b.setAttribute('aria-label', 'Quitar ' + pc.name + '. Hay ' + n + '.');
+      b.appendChild(pieceVisual(pc));
+      if (n > 1) {
+        const bd = document.createElement('span');
+        bd.className = 'badge';
+        bd.setAttribute('aria-hidden', 'true');
+        bd.textContent = '×' + n;
+        b.appendChild(bd);
+      }
+      b.addEventListener('click', () => remove(v));
+      el.items.appendChild(b);
+    });
+    const hidden = !L.showTotal; // the feedback text shows the total instead
+    $('ct-head').hidden = hidden;
+    el.total.textContent = hidden ? '' : 'Llevas ' + fmt(sum);
+    el.pay.disabled = sum === 0;
+    if (focusV) {
+      const f = el.items.querySelector('[data-v="' + focusV + '"]');
+      if (f) f.focus({ preventScroll: true });
+    }
+  }
+
+  function add(v) {
+    if (mode !== 'answering' || countPieces(counts) >= MAX_PIECES) return;
+    Kit.sfx('tap');
+    counts[v] = (counts[v] || 0) + 1;
+    renderCounter();
+  }
+  function remove(v) {
+    if (mode !== 'answering' || !counts[v]) return;
+    Kit.sfx('tap');
+    counts[v]--;
+    if (!counts[v]) delete counts[v];
+    renderCounter(counts[v] ? v : 0);
+  }
+  function clearAll() {
+    if (mode !== 'answering') return;
+    Kit.sfx('tap');
+    counts = {};
+    renderCounter();
+  }
+
+  /* ---------- answering ---------- */
+
+  function solutionEl(sol) {
+    const box = $('fb-sol');
+    box.textContent = '';
+    if (!sol) return;
+    const lead = document.createElement('span');
+    lead.className = 'lead';
+    lead.textContent = 'Una forma:';
+    box.appendChild(lead);
+    Object.keys(sol).map(Number).sort((a, b) => b - a).forEach((v) => {
+      const g = document.createElement('span');
+      g.className = 'g mini';
+      g.setAttribute('role', 'img');
+      g.setAttribute('aria-label', sol[v] + ' × ' + PIECE[v].name);
+      if (sol[v] > 1) g.appendChild(document.createTextNode(sol[v] + '×'));
+      g.appendChild(pieceVisual(PIECE[v]));
+      box.appendChild(g);
+    });
+  }
+
+  function pay() {
+    if (mode !== 'answering') return;
+    const L = LEVELS[level - 1];
+    const q = queue[pos], it = q.item;
+    const sum = totalOf(counts);
+    if (sum === 0) return;
+    const right = sum === it.target;
+    mode = 'feedback';
+    setPhase(false);
+    renderCounter();
+    el.counter.classList.add(right ? 'is-ok' : 'is-ko');
+    const title = $('fb-title');
+    title.className = 'fb__title ' + (right ? 'is-ok' : 'is-ko');
+    title.textContent = right ? '✓ ' + Kit.praise() : '✗ ' + Kit.encourage();
+    let speech;
+    if (right) {
+      $('fb-line').textContent = L.change ? 'El cambio es ' + fmt(it.target) + '.' : 'Son ' + fmt(it.target) + '.';
+      $('fb-diff').textContent = '';
+      solutionEl(null);
+      speech = L.change ? 'El cambio es ' + spoken(it.target) + '.' : 'Son ' + spoken(it.target) + '.';
+    } else {
+      const diff = Math.abs(sum - it.target);
+      const less = sum < it.target;
+      $('fb-line').textContent = L.change
+        ? 'Has dado ' + fmt(sum) + '. El cambio es ' + fmt(it.target) + '.'
+        : 'Has puesto ' + fmt(sum) + '. Cuesta ' + fmt(it.target) + '.';
+      $('fb-diff').textContent = (less ? 'Faltan ' : 'Sobran ') + fmt(diff) + '.';
+      solutionEl(it.solution);
+      speech = (L.change ? 'El cambio es ' : 'Son ') + spoken(it.target) + '. ' + (less ? 'Faltan ' : 'Sobran ') + spoken(diff) + '.';
+    }
+    Kit.sfx(right ? 'ok' : 'ko');
+    setTimeout(() => { if (mode === 'feedback') Kit.speak(speech, 'es'); }, 350);
+    if (!q.rep) {
+      if (right) { score++; results[q.orig] = true; }
+      else {
+        results[q.orig] = false;
+        const at = Math.min(queue.length, pos + 1 + Kit.randInt(2, 4));
+        queue.splice(at, 0, { item: it, orig: q.orig, rep: true });
+      }
+    }
+    renderDots();
+    $('next').focus({ preventScroll: true });
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    pos++;
+    if (pos >= queue.length) finish();
+    else showQuestion();
+  }
+
+  function sayQuestion() {
+    const q = queue[pos];
+    if (!q) return;
+    const it = q.item, L = LEVELS[level - 1];
+    let t = it.prod.n + ' cuesta ' + spoken(it.price) + '. ';
+    t += L.change ? 'El cliente paga con ' + PIECE[it.pay].say + '. Da el cambio.' : 'Paga con tus monedas.';
+    Kit.speak(t, 'es');
+  }
+
+  /* ---------- result ---------- */
+
+  function finish() {
+    mode = 'idle';
+    const s = load();
+    const n = Kit.stars.calc(score, ROUND);
+    const best = Object.assign({}, s.best);
+    best[level] = Math.max(best[level] || 0, n);
+    const opens = n >= 2 && level < LEVELS.length;
+    const newly = opens && !isOpen(level + 1, s);
+    store.set({ best, unlocked: Math.max(s.unlocked, opens ? level + 1 : 1) });
+
+    const extra = document.createElement('div');
+    extra.style.width = '100%';
+    const big = document.createElement('div');
+    big.setAttribute('aria-hidden', 'true');
+    big.style.fontSize = '64px';
+    big.style.lineHeight = '1';
+    big.textContent = '🛒';
+    extra.appendChild(big);
+    if (newly) {
+      const u = document.createElement('p');
+      u.className = 'unlock';
+      u.textContent = '🔓 ¡Nivel ' + (level + 1) + ' abierto!';
+      extra.appendChild(u);
+    }
+
+    const actions = [];
+    if (opens) actions.push({ label: 'Siguiente nivel', primary: true, onClick: () => startRound(level + 1) });
+    actions.push({ label: 'Elegir nivel', onClick: showStart });
+
+    Kit.result({ slug: SLUG, score, total: ROUND, extra, actions, onAgain: () => startRound(level) });
+  }
+
+  /* ---------- wiring ---------- */
+
+  $('pay').addEventListener('click', pay);
+  $('clear').addEventListener('click', clearAll);
+  $('next').addEventListener('click', next);
+  $('say').addEventListener('click', sayQuestion);
+  $('quit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+
+  Kit.mount({ slug: SLUG, title: 'La tienda' });
+  showStart();
+
+  // Hooks for the automated checks (not used by the game itself).
+  window.__tienda = { PIECES, PRODUCTS, LEVELS, fmt, totalOf, fewest, spoken, makeRound, makeItem,
+                      state: () => ({ level, pos, score, mode, queue, counts }) };
+})();
+</script>
+</body>
+</html>
