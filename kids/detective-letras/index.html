@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Detective de letras: descubre la letra que falta y aprende ortografía.">
+<meta name="theme-color" content="#fff8ec">
+<title>Detective de letras</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .menu { display: flex; flex-direction: column; gap: 8px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0 0 4px; text-align: center; color: var(--muted); font-weight: 700; }
+  .fams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  @media (min-width: 900px) { .fams { grid-template-columns: repeat(3, 1fr); } }
+  .fams li { display: flex; }
+  .fam {
+    flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 96px; padding: 10px 12px;
+    text-align: left; border: 3px solid var(--accent); border-radius: var(--radius);
+    background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--accent); cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .fam:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .fam__name { font-size: 26px; font-weight: 900; line-height: 1.1; }
+  .fam__sub { font-size: 20px; font-weight: 600; color: var(--muted); line-height: 1.15; }
+  .fam__mast { margin-top: auto; font-size: 20px; font-weight: 800; }
+  .fams li.is-mix { grid-column: 1 / -1; }
+  .fam.is-mix { background: var(--accent); color: var(--on-accent); min-height: 80px; }
+  .fam.is-mix .fam__sub { color: var(--on-accent); opacity: .85; }
+
+  .play { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .play-top { display: flex; align-items: center; gap: 10px; }
+  .play-top .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .play-top .k-progress { flex: 1; gap: 6px; flex-wrap: nowrap; }
+  .play-top .k-progress > i { width: 16px; height: 16px; border-width: 3px; flex: none; }
+
+  .prompt { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px 12px; }
+  .prompt-head { display: flex; align-items: center; gap: 10px; }
+  .msg { flex: 1; min-width: 0; font-size: 22px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+  .msg.is-ok { color: var(--ok); }
+  .msg.is-ko { color: var(--ko); }
+  .say { flex: none; min-width: 56px; min-height: 56px; border-radius: 50%; border: 2px solid var(--line); background: var(--card);
+         font-size: 26px; cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+  .say:active { transform: translateY(2px); }
+  .wordrow { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 12px; min-height: 64px; }
+  .pic { flex: none; font-size: 48px; line-height: 1; }
+  .word { font-size: clamp(30px, 10vw, 56px); font-weight: 900; line-height: 1.1; letter-spacing: 1px; color: var(--ink); white-space: nowrap; }
+  .slot { display: inline-block; min-width: 1.1em; margin: 0 2px; border-bottom: 6px solid var(--accent); text-align: center; color: var(--ok); }
+  .slot.is-open::after { content: "\00a0"; }
+  .slot.is-done { min-width: 0; margin: 0; border-bottom-color: var(--ok); }
+  .slot.is-none { display: none; }
+
+  .choices { display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); gap: 12px; }
+  .choices .k-choice { min-height: 72px; padding: 6px 10px; font-size: 34px; font-weight: 900; line-height: 1.1; }
+  .choices.is-text { grid-template-columns: 1fr; gap: 10px; }
+  .choices.is-text .k-choice { min-height: 72px; padding: 8px 12px; font-size: 28px; font-weight: 800; line-height: 1.15; text-align: center; }
+  .choices .k-choice:disabled { cursor: default; }
+  .choices .k-choice:disabled:not(.is-ok):not(.is-ko) { opacity: .55; }
+
+  .fb { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+  .fb__rule { font-size: 20px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+  .fb .k-btn { width: 100%; }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir tema">
+    <div class="menu">
+      <h2>¡Elige una pista!</h2>
+      <p>Descubre la letra que falta.</p>
+      <ul class="fams" id="fams"></ul>
+    </div>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="play-top">
+      <button type="button" class="k-btn k-btn--ghost" id="quit" aria-label="Volver a las pistas">‹ Pistas</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+    <div class="k-card prompt" id="prompt">
+      <div class="prompt-head">
+        <div class="msg" id="msg" role="status" aria-live="polite"></div>
+        <button type="button" class="say" id="say" aria-label="Escuchar">🔊</button>
+      </div>
+      <div class="wordrow" id="wordrow">
+        <span class="pic" id="pic" aria-hidden="true"></span>
+        <span class="word" id="word" role="img"></span>
+      </div>
+    </div>
+    <div class="choices" id="choices"></div>
+    <div class="fb" id="fb" hidden>
+      <div class="fb__rule" id="rule"></div>
+      <button type="button" class="k-btn k-btn--big" id="next">Siguiente</button>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: spelling families (edit here) =====
+     Each family has: id, name, sub (examples), kind ('gap' or 'sentence'), rules (tag -> one short sentence).
+     kind 'gap': `choices` are the candidate letters ('' means "sin h"). Each item is
+        [full word, word with ONE "_" gap, correct letters, emoji ('' if none), rule tag (optional, default = correct letters)]
+        The gap filled with the correct letters must give the full word (the self test checks it).
+     kind 'sentence': each item is [correct sentence, wrong sentence, rule tag].
+     Spelling follows the RAE dictionary. Leave out any word you are not sure about. */
+  const SLUG = 'detective-letras';
+  const ROUND = 10;
+  const DATA = [
+    { id: 'c-qu', name: 'c / qu', sub: 'casa, queso', kind: 'gap', choices: ['c', 'qu'],
+      rules: {
+        c: 'Delante de a, o, u se escribe c: casa, coche, cuna.',
+        qu: 'Delante de e, i se escribe qu: queso, quince. La u no suena.'
+      },
+      items: [
+        ['casa', '_asa', 'c', '🏠'], ['cama', '_ama', 'c', '🛏️'], ['coche', '_oche', 'c', '🚗'], ['cuna', '_una', 'c', '👶'],
+        ['cola', '_ola', 'c', ''], ['cuchara', '_uchara', 'c', '🥄'], ['cuento', '_uento', 'c', '📖'], ['conejo', '_onejo', 'c', '🐰'],
+        ['cocina', '_ocina', 'c', '🍳'], ['cubo', '_ubo', 'c', ''], ['cuadro', '_uadro', 'c', '🖼️'], ['cuerda', '_uerda', 'c', ''],
+        ['camino', '_amino', 'c', '🛤️'], ['calle', '_alle', 'c', '🛣️'], ['camisa', '_amisa', 'c', '👔'], ['caballo', '_aballo', 'c', '🐴'],
+        ['campana', '_ampana', 'c', '🔔'], ['cabeza', '_abeza', 'c', ''], ['corazón', '_orazón', 'c', '❤️'], ['cohete', '_ohete', 'c', '🚀'],
+        ['cumpleaños', '_umpleaños', 'c', '🎂'],
+        ['queso', '_eso', 'qu', '🧀'], ['quince', '_ince', 'qu', ''], ['quiero', '_iero', 'qu', ''], ['quieto', '_ieto', 'qu', ''],
+        ['parque', 'par_e', 'qu', '🌳'], ['esquina', 'es_ina', 'qu', ''], ['máquina', 'má_ina', 'qu', ''], ['mosquito', 'mos_ito', 'qu', '🦟'],
+        ['chaqueta', 'cha_eta', 'qu', '🧥'], ['raqueta', 'ra_eta', 'qu', '🎾'], ['paquete', 'pa_ete', 'qu', '📦'], ['bosque', 'bos_e', 'qu', '🌲'],
+        ['pequeño', 'pe_eño', 'qu', ''], ['tranquilo', 'tran_ilo', 'qu', '😌'], ['esqueleto', 'es_eleto', 'qu', '💀'], ['orquesta', 'or_esta', 'qu', '🎻'],
+        ['aquí', 'a_í', 'qu', ''], ['bloque', 'blo_e', 'qu', '🧱'], ['esquí', 'es_í', 'qu', '⛷️']
+      ] },
+
+    { id: 'c-z', name: 'c / z', sub: 'cielo, zapato', kind: 'gap', choices: ['c', 'z'],
+      rules: {
+        c: 'Delante de e, i se escribe c: cielo, cena, cine.',
+        z: 'Delante de a, o, u se escribe z: zapato, zumo.',
+        zfin: 'Al final de la palabra se escribe z: luz, pez.'
+      },
+      items: [
+        ['cielo', '_ielo', 'c', '☁️'], ['cena', '_ena', 'c', '🍽️'], ['cine', '_ine', 'c', '🎬'], ['cebolla', '_ebolla', 'c', '🧅'],
+        ['cesta', '_esta', 'c', '🧺'], ['cepillo', '_epillo', 'c', '🪥'], ['ciudad', '_iudad', 'c', '🏙️'], ['cerdo', '_erdo', 'c', '🐷'],
+        ['círculo', '_írculo', 'c', '⭕'], ['cocina', 'co_ina', 'c', '🍳'], ['dulce', 'dul_e', 'c', '🍬'], ['doce', 'do_e', 'c', ''],
+        ['cereal', '_ereal', 'c', '🥣'], ['ceja', '_eja', 'c', ''], ['circo', '_irco', 'c', '🎪'], ['hacer', 'ha_er', 'c', ''],
+        ['césped', '_ésped', 'c', '🌱'], ['conocer', 'cono_er', 'c', ''], ['centro', '_entro', 'c', ''], ['cinta', '_inta', 'c', ''],
+        ['zapato', '_apato', 'z', '👟'], ['zumo', '_umo', 'z', '🧃'], ['zanahoria', '_anahoria', 'z', '🥕'], ['azul', 'a_ul', 'z', '🔵'],
+        ['azúcar', 'a_úcar', 'z', ''], ['cabeza', 'cabe_a', 'z', ''], ['corazón', 'cora_ón', 'z', '❤️'], ['cazuela', 'ca_uela', 'z', '🍲'],
+        ['abrazo', 'abra_o', 'z', '🤗'], ['zapatilla', '_apatilla', 'z', '👟'], ['cereza', 'cere_a', 'z', '🍒'], ['pizarra', 'pi_arra', 'z', ''],
+        ['almuerzo', 'almuer_o', 'z', '🍝'], ['empezar', 'empe_ar', 'z', ''], ['cruzar', 'cru_ar', 'z', ''], ['comenzar', 'comen_ar', 'z', ''],
+        ['luz', 'lu_', 'z', '💡', 'zfin'], ['pez', 'pe_', 'z', '🐟', 'zfin'], ['arroz', 'arro_', 'z', '🍚', 'zfin'], ['nariz', 'nari_', 'z', '👃', 'zfin'],
+        ['feliz', 'feli_', 'z', '😀', 'zfin'], ['lápiz', 'lápi_', 'z', '✏️', 'zfin'], ['cruz', 'cru_', 'z', '', 'zfin'], ['voz', 'vo_', 'z', '🗣️', 'zfin']
+      ] },
+
+    { id: 'g-gu', name: 'g / gu / gü', sub: 'gato, guitarra, pingüino', kind: 'gap', choices: ['g', 'gu', 'gü'],
+      rules: {
+        g: 'Delante de a, o, u se escribe g: gato, goma. También en gl y gr.',
+        gu: 'Delante de e, i se escribe gu: guitarra, juguete. La u no suena.',
+        'gü': 'Si la u suena delante de e, i, lleva dos puntitos: pingüino.'
+      },
+      items: [
+        ['gato', '_ato', 'g', '🐱'], ['goma', '_oma', 'g', ''], ['gorro', '_orro', 'g', '🧢'], ['gafas', '_afas', 'g', '👓'],
+        ['globo', '_lobo', 'g', '🎈'], ['lago', 'la_o', 'g', '🏞️'], ['amigo', 'ami_o', 'g', ''], ['tortuga', 'tortu_a', 'g', '🐢'],
+        ['hormiga', 'hormi_a', 'g', '🐜'], ['gusano', '_usano', 'g', '🐛'], ['galleta', '_alleta', 'g', '🍪'], ['gota', '_ota', 'g', '💧'],
+        ['gallina', '_allina', 'g', '🐔'], ['mago', 'ma_o', 'g', '🧙'], ['ganso', '_anso', 'g', ''], ['regalo', 're_alo', 'g', '🎁'],
+        ['pegamento', 'pe_amento', 'g', ''], ['luego', 'lue_o', 'g', ''], ['juego', 'jue_o', 'g', '🎲'], ['fuego', 'fue_o', 'g', '🔥'],
+        ['alegre', 'ale_re', 'g', '😄'], ['gorila', '_orila', 'g', '🦍'],
+        ['guitarra', '_itarra', 'gu', '🎸'], ['guepardo', '_epardo', 'gu', '🐆'], ['águila', 'á_ila', 'gu', '🦅'], ['manguera', 'man_era', 'gu', ''],
+        ['juguete', 'ju_ete', 'gu', '🧸'], ['hamburguesa', 'hambur_esa', 'gu', '🍔'], ['espagueti', 'espa_eti', 'gu', '🍝'], ['seguir', 'se_ir', 'gu', ''],
+        ['siguiente', 'si_iente', 'gu', ''], ['merengue', 'meren_e', 'gu', ''], ['guisante', '_isante', 'gu', ''], ['sigue', 'si_e', 'gu', ''],
+        ['anguila', 'an_ila', 'gu', ''],
+        ['pingüino', 'pin_ino', 'gü', '🐧'], ['cigüeña', 'ci_eña', 'gü', ''], ['vergüenza', 'ver_enza', 'gü', '😳'], ['bilingüe', 'bilin_e', 'gü', '🗣️'],
+        ['desagüe', 'desa_e', 'gü', '🚰'], ['paragüero', 'para_ero', 'gü', '☂️']
+      ] },
+
+    { id: 'g-j', name: 'g / j', sub: 'gente, jirafa', kind: 'gap', choices: ['g', 'j'],
+      rules: {
+        g: 'Esta palabra se escribe con g: ¡hay que recordarla!',
+        ger: 'Los verbos acabados en -ger y -gir suelen llevar g: coger, elegir.',
+        j: 'Esta palabra se escribe con j: ¡hay que recordarla!',
+        aje: 'Las palabras acabadas en -aje llevan j: viaje, garaje.',
+        jero: 'Las palabras acabadas en -jero llevan j: cajero, extranjero.'
+      },
+      items: [
+        ['gente', '_ente', 'g', ''], ['gigante', '_igante', 'g', ''], ['girasol', '_irasol', 'g', '🌻'], ['gimnasia', '_imnasia', 'g', '🤸'],
+        ['gemelos', '_emelos', 'g', '👯'], ['genio', '_enio', 'g', '🧞'], ['ángel', 'án_el', 'g', '👼'], ['imagen', 'ima_en', 'g', '🖼️'],
+        ['magia', 'ma_ia', 'g', '✨'], ['colegio', 'cole_io', 'g', '🏫'], ['página', 'pá_ina', 'g', '📄'], ['vegetal', 've_etal', 'g', '🥦'],
+        ['gelatina', '_elatina', 'g', ''], ['agenda', 'a_enda', 'g', '📒'], ['ingeniero', 'in_eniero', 'g', '👷'], ['geografía', '_eografía', 'g', '🌍'],
+        ['urgente', 'ur_ente', 'g', ''],
+        ['coger', 'co_er', 'g', '', 'ger'], ['escoger', 'esco_er', 'g', '', 'ger'], ['recoger', 'reco_er', 'g', '', 'ger'],
+        ['elegir', 'ele_ir', 'g', '', 'ger'], ['dirigir', 'diri_ir', 'g', '', 'ger'], ['proteger', 'prote_er', 'g', '', 'ger'],
+        ['jirafa', '_irafa', 'j', '🦒'], ['jefe', '_efe', 'j', ''], ['jinete', '_inete', 'j', '🏇'], ['ajedrez', 'a_edrez', 'j', '♟️'],
+        ['viejo', 'vie_o', 'j', '👴'], ['ejemplo', 'e_emplo', 'j', ''], ['tijeras', 'ti_eras', 'j', '✂️'], ['cojín', 'co_ín', 'j', ''],
+        ['mujer', 'mu_er', 'j', '👩'], ['tejer', 'te_er', 'j', '🧶'], ['jeringa', '_eringa', 'j', '💉'],
+        ['mensaje', 'mensa_e', 'j', '💬', 'aje'], ['viaje', 'via_e', 'j', '🧳', 'aje'], ['garaje', 'gara_e', 'j', '🚗', 'aje'],
+        ['traje', 'tra_e', 'j', '🤵', 'aje'], ['paisaje', 'paisa_e', 'j', '🏞️', 'aje'], ['equipaje', 'equipa_e', 'j', '🧳', 'aje'],
+        ['extranjero', 'extran_ero', 'j', '', 'jero'], ['pasajero', 'pasa_ero', 'j', '', 'jero'], ['cajero', 'ca_ero', 'j', '', 'jero']
+      ] },
+
+    { id: 'r-rr', name: 'r / rr', sub: 'ratón, perro', kind: 'gap', choices: ['r', 'rr'],
+      rules: {
+        rini: 'Al principio de la palabra se escribe una sola r: ratón, rosa.',
+        rafter: 'Después de l o n el sonido fuerte se escribe con una sola r: alrededor.',
+        rsoft: 'Entre vocales, el sonido suave se escribe con una r: toro, oreja.',
+        rr: 'Entre vocales, el sonido fuerte se escribe rr: perro, tierra.'
+      },
+      items: [
+        ['ratón', '_atón', 'r', '🐭', 'rini'], ['rana', '_ana', 'r', '🐸', 'rini'], ['rosa', '_osa', 'r', '🌹', 'rini'], ['rueda', '_ueda', 'r', '', 'rini'],
+        ['regalo', '_egalo', 'r', '🎁', 'rini'], ['reloj', '_eloj', 'r', '⌚', 'rini'], ['risa', '_isa', 'r', '😂', 'rini'], ['río', '_ío', 'r', '🏞️', 'rini'],
+        ['rojo', '_ojo', 'r', '🔴', 'rini'], ['ropa', '_opa', 'r', '👚', 'rini'], ['radio', '_adio', 'r', '📻', 'rini'], ['rayo', '_ayo', 'r', '⚡', 'rini'],
+        ['rama', '_ama', 'r', '🌿', 'rini'], ['robot', '_obot', 'r', '🤖', 'rini'],
+        ['alrededor', 'al_ededor', 'r', '', 'rafter'], ['sonreír', 'son_eír', 'r', '😊', 'rafter'],
+        ['toro', 'to_o', 'r', '🐂', 'rsoft'], ['oreja', 'o_eja', 'r', '👂', 'rsoft'], ['pirata', 'pi_ata', 'r', '🏴‍☠️', 'rsoft'], ['dinero', 'dine_o', 'r', '💶', 'rsoft'],
+        ['mariposa', 'ma_iposa', 'r', '🦋', 'rsoft'], ['arena', 'a_ena', 'r', '🏖️', 'rsoft'], ['pájaro', 'pája_o', 'r', '🐦', 'rsoft'], ['caramelo', 'ca_amelo', 'r', '🍬', 'rsoft'],
+        ['lámpara', 'lámpa_a', 'r', '💡', 'rsoft'], ['naranja', 'na_anja', 'r', '🍊', 'rsoft'], ['zanahoria', 'zanaho_ia', 'r', '🥕', 'rsoft'], ['mirar', 'mi_ar', 'r', '👀', 'rsoft'],
+        ['sirena', 'si_ena', 'r', '🧜', 'rsoft'],
+        ['perro', 'pe_o', 'rr', '🐶'], ['tierra', 'tie_a', 'rr', '🌍'], ['torre', 'to_e', 'rr', '🏰'], ['gorra', 'go_a', 'rr', '🧢'],
+        ['correr', 'co_er', 'rr', '🏃'], ['arroz', 'a_oz', 'rr', '🍚'], ['carretera', 'ca_etera', 'rr', '🛣️'], ['terremoto', 'te_emoto', 'rr', ''],
+        ['pizarra', 'piza_a', 'rr', ''], ['serrucho', 'se_ucho', 'rr', '🪚'], ['aburrido', 'abu_ido', 'rr', '🥱'], ['arriba', 'a_iba', 'rr', '⬆️'],
+        ['guitarra', 'guita_a', 'rr', '🎸'], ['barriga', 'ba_iga', 'rr', ''], ['carrera', 'ca_era', 'rr', '🏁'], ['cerrojo', 'ce_ojo', 'rr', '🔒'],
+        ['ferrocarril', 'fe_ocarril', 'rr', '🚂'], ['barrer', 'ba_er', 'rr', '🧹'], ['cigarra', 'ciga_a', 'rr', '']
+      ] },
+
+    { id: 'm-n', name: 'm / n', sub: 'campo, bombero', kind: 'gap', choices: ['m', 'n'],
+      rules: {
+        m: 'Antes de p y de b se escribe m: campo, bombero.',
+        n: 'Antes de v y de f se escribe n: invierno, enfermo.'
+      },
+      items: [
+        ['campo', 'ca_po', 'm', '🏕️'], ['bombero', 'bo_bero', 'm', '🧑‍🚒'], ['lámpara', 'lá_para', 'm', '💡'], ['ambulancia', 'a_bulancia', 'm', '🚑'],
+        ['hombre', 'ho_bre', 'm', '👨'], ['cumpleaños', 'cu_pleaños', 'm', '🎂'], ['siempre', 'sie_pre', 'm', ''], ['nombre', 'no_bre', 'm', '📛'],
+        ['tambor', 'ta_bor', 'm', '🥁'], ['cambiar', 'ca_biar', 'm', ''], ['campana', 'ca_pana', 'm', '🔔'], ['sombra', 'so_bra', 'm', ''],
+        ['sombrero', 'so_brero', 'm', '👒'], ['trompeta', 'tro_peta', 'm', '🎺'], ['tiempo', 'tie_po', 'm', '⏳'], ['comprar', 'co_prar', 'm', '🛍️'],
+        ['también', 'ta_bién', 'm', ''], ['ejemplo', 'eje_plo', 'm', ''], ['importante', 'i_portante', 'm', ''], ['empujar', 'e_pujar', 'm', ''],
+        ['empezar', 'e_pezar', 'm', ''], ['imposible', 'i_posible', 'm', ''], ['cumbre', 'cu_bre', 'm', '🏔️'], ['ombligo', 'o_bligo', 'm', ''],
+        ['campeón', 'ca_peón', 'm', '🏆'], ['hambre', 'ha_bre', 'm', ''],
+        ['invierno', 'i_vierno', 'n', '❄️'], ['enfermo', 'e_fermo', 'n', '🤒'], ['invitar', 'i_vitar', 'n', '💌'], ['envase', 'e_vase', 'n', '🥫'],
+        ['enviar', 'e_viar', 'n', '✉️'], ['inventar', 'i_ventar', 'n', '💡'], ['enfadado', 'e_fadado', 'n', '😠'], ['conversar', 'co_versar', 'n', '🗣️'],
+        ['confeti', 'co_feti', 'n', '🎉'], ['informar', 'i_formar', 'n', ''], ['enfermera', 'e_fermera', 'n', '👩‍⚕️'], ['envolver', 'e_volver', 'n', '🎁']
+      ] },
+
+    { id: 'b-v', name: 'b / v', sub: 'barco, lluvia', kind: 'gap', choices: ['b', 'v'],
+      rules: {
+        b: 'Esta palabra se escribe con b: ¡hay que recordarla!',
+        v: 'Esta palabra se escribe con v: ¡hay que recordarla!',
+        mb: 'Después de m siempre va b: hambre, hombre, bombero.',
+        bbl: 'Con bl y con br siempre va b: libro, blanco, sobre.',
+        aba: 'Los verbos acabados en -aba llevan b: jugaba, cantaba.',
+        bir: 'Los verbos acabados en -bir llevan b: escribir, subir (menos vivir).',
+        nv: 'Después de n se escribe v: invierno, enviar.'
+      },
+      items: [
+        ['barco', '_arco', 'b', '⛵'], ['botella', '_otella', 'b', ''], ['bicicleta', '_icicleta', 'b', '🚲'], ['bañera', '_añera', 'b', '🛁'],
+        ['bandera', '_andera', 'b', '🚩'], ['bebé', 'be_é', 'b', '👶'], ['abuela', 'a_uela', 'b', '👵'], ['caballo', 'ca_allo', 'b', '🐴'],
+        ['tiburón', 'ti_urón', 'b', '🦈'], ['bosque', '_osque', 'b', '🌲'], ['rubio', 'ru_io', 'b', '👱'], ['nube', 'nu_e', 'b', '☁️'],
+        ['lobo', 'lo_o', 'b', '🐺'], ['sábado', 'sá_ado', 'b', '📅'], ['árbol', 'ár_ol', 'b', '🌳'], ['bolsa', '_olsa', 'b', '👜'],
+        ['bolígrafo', '_olígrafo', 'b', '🖊️'], ['bailar', '_ailar', 'b', '💃'], ['biberón', '_iberón', 'b', '🍼'], ['cebolla', 'ce_olla', 'b', '🧅'],
+        ['sábana', 'sá_ana', 'b', '🛏️'], ['bocadillo', '_ocadillo', 'b', '🥪'],
+        ['libro', 'li_ro', 'b', '📖', 'bbl'], ['blanco', '_lanco', 'b', '⚪', 'bbl'], ['bruja', '_ruja', 'b', '🧙‍♀️', 'bbl'], ['cabra', 'ca_ra', 'b', '🐐', 'bbl'],
+        ['sobre', 'so_re', 'b', '✉️', 'bbl'], ['abrir', 'a_rir', 'b', '🚪', 'bbl'], ['tabla', 'ta_la', 'b', '', 'bbl'], ['pobre', 'po_re', 'b', '', 'bbl'],
+        ['hambre', 'ham_re', 'b', '', 'mb'], ['ombligo', 'om_ligo', 'b', '', 'mb'], ['hombre', 'hom_re', 'b', '👨', 'mb'], ['nombre', 'nom_re', 'b', '📛', 'mb'],
+        ['bombero', 'bom_ero', 'b', '🧑‍🚒', 'mb'], ['tambor', 'tam_or', 'b', '🥁', 'mb'], ['también', 'tam_ién', 'b', '', 'mb'], ['ambulancia', 'am_ulancia', 'b', '🚑', 'mb'],
+        ['sombrero', 'som_rero', 'b', '👒', 'mb'], ['alfombra', 'alfom_ra', 'b', '', 'mb'],
+        ['jugaba', 'juga_a', 'b', '🎮', 'aba'], ['cantaba', 'canta_a', 'b', '🎤', 'aba'], ['saltaba', 'salta_a', 'b', '🤸', 'aba'],
+        ['nadaba', 'nada_a', 'b', '🏊', 'aba'], ['pintaba', 'pinta_a', 'b', '🎨', 'aba'],
+        ['escribir', 'escri_ir', 'b', '✍️', 'bir'], ['subir', 'su_ir', 'b', '⬆️', 'bir'], ['recibir', 'reci_ir', 'b', '📬', 'bir'],
+        ['uva', 'u_a', 'v', '🍇'], ['viento', '_iento', 'v', '🌬️'], ['lluvia', 'llu_ia', 'v', '🌧️'], ['nieve', 'nie_e', 'v', '❄️'],
+        ['verde', '_erde', 'v', '🟢'], ['violín', '_iolín', 'v', '🎻'], ['ventana', '_entana', 'v', '🪟'], ['vestido', '_estido', 'v', '👗'],
+        ['nuevo', 'nue_o', 'v', '🆕'], ['huevo', 'hue_o', 'v', '🥚'], ['llave', 'lla_e', 'v', '🔑'], ['avión', 'a_ión', 'v', '✈️'],
+        ['oveja', 'o_eja', 'v', '🐑'], ['primavera', 'prima_era', 'v', '🌸'], ['volcán', '_olcán', 'v', '🌋'], ['vecino', '_ecino', 'v', ''],
+        ['verano', '_erano', 'v', '☀️'], ['valiente', '_aliente', 'v', '🦸'], ['nave', 'na_e', 'v', '🚀'], ['cueva', 'cue_a', 'v', ''],
+        ['pavo', 'pa_o', 'v', '🦃'], ['llover', 'llo_er', 'v', '☔'], ['olvidar', 'ol_idar', 'v', ''], ['vivir', 'vi_ir', 'v', ''],
+        ['avispa', 'a_ispa', 'v', '🐝'], ['cuervo', 'cuer_o', 'v', ''], ['novio', 'no_io', 'v', '🤵'], ['vitamina', '_itamina', 'v', '💊'],
+        ['vampiro', '_ampiro', 'v', '🧛'], ['viaje', '_iaje', 'v', '🧳'],
+        ['invierno', 'in_ierno', 'v', '❄️', 'nv'], ['invitar', 'in_itar', 'v', '💌', 'nv'], ['enviar', 'en_iar', 'v', '✉️', 'nv'],
+        ['inventar', 'in_entar', 'v', '💡', 'nv'], ['envolver', 'en_olver', 'v', '🎁', 'nv']
+      ] },
+
+    { id: 'h', name: 'Con o sin h', sub: 'huevo, hielo, ola', kind: 'gap', choices: ['h', ''],
+      rules: {
+        hue: 'Las palabras que empiezan por hue- y hie- llevan h: huevo, hielo.',
+        h: 'Esta palabra lleva h. La h no suena, ¡hay que recordarla!',
+        none: 'Esta palabra no lleva h: se escribe sin h.'
+      },
+      items: [
+        ['huevo', '_uevo', 'h', '🥚', 'hue'], ['hielo', '_ielo', 'h', '🧊', 'hue'], ['hueso', '_ueso', 'h', '🦴', 'hue'], ['huerto', '_uerto', 'h', '🥬', 'hue'],
+        ['hierba', '_ierba', 'h', '🌿', 'hue'], ['hierro', '_ierro', 'h', '', 'hue'],
+        ['hormiga', '_ormiga', 'h', '🐜', 'h'], ['hoja', '_oja', 'h', '🍃', 'h'], ['hotel', '_otel', 'h', '🏨', 'h'], ['helado', '_elado', 'h', '🍦', 'h'],
+        ['hada', '_ada', 'h', '🧚', 'h'], ['hijo', '_ijo', 'h', '👦', 'h'], ['hermano', '_ermano', 'h', '🧒', 'h'], ['hermana', '_ermana', 'h', '👧', 'h'],
+        ['harina', '_arina', 'h', '🌾', 'h'], ['hospital', '_ospital', 'h', '🏥', 'h'], ['humo', '_umo', 'h', '💨', 'h'], ['hilo', '_ilo', 'h', '🧵', 'h'],
+        ['hongo', '_ongo', 'h', '🍄', 'h'], ['helicóptero', '_elicóptero', 'h', '🚁', 'h'], ['hipopótamo', '_ipopótamo', 'h', '🦛', 'h'],
+        ['historia', '_istoria', 'h', '📚', 'h'], ['hámster', '_ámster', 'h', '🐹', 'h'], ['hoy', '_oy', 'h', '📅', 'h'],
+        ['zanahoria', 'zana_oria', 'h', '🥕', 'h'], ['ahora', 'a_ora', 'h', '⏰', 'h'], ['almohada', 'almo_ada', 'h', '🛏️', 'h'], ['búho', 'bú_o', 'h', '🦉', 'h'],
+        ['cacahuete', 'caca_uete', 'h', '🥜', 'h'], ['ahí', 'a_í', 'h', '👉', 'h'],
+        ['oso', '_oso', '', '🐻', 'none'], ['ojo', '_ojo', '', '👁️', 'none'], ['ola', '_ola', '', '🌊', 'none'], ['oreja', '_oreja', '', '👂', 'none'],
+        ['uva', '_uva', '', '🍇', 'none'], ['uña', '_uña', '', '💅', 'none'], ['isla', '_isla', '', '🏝️', 'none'], ['abuela', '_abuela', '', '👵', 'none'],
+        ['escuela', '_escuela', '', '🏫', 'none'], ['anillo', '_anillo', '', '💍', 'none'], ['árbol', '_árbol', '', '🌳', 'none'], ['aire', '_aire', '', '💨', 'none'],
+        ['ocho', '_ocho', '', '8️⃣', 'none'], ['oro', '_oro', '', '🥇', 'none'], ['elefante', '_elefante', '', '🐘', 'none'], ['iglesia', '_iglesia', '', '⛪', 'none'],
+        ['idea', '_idea', '', '💡', 'none'], ['avión', '_avión', '', '✈️', 'none'], ['ostra', '_ostra', '', '🦪', 'none'], ['aceite', '_aceite', '', '🫒', 'none'],
+        ['armario', '_armario', '', '🚪', 'none'], ['estrella', '_estrella', '', '⭐', 'none']
+      ] },
+
+    { id: 'll-y', name: 'll / y', sub: 'lluvia, yogur', kind: 'gap', choices: ['ll', 'y'],
+      rules: {
+        ll: 'Esta palabra se escribe con ll: ¡hay que recordarla!',
+        illo: 'Las palabras acabadas en -illo e -illa llevan ll: cuchillo, tortilla.',
+        y: 'Esta palabra se escribe con y: ¡hay que recordarla!'
+      },
+      items: [
+        ['lluvia', '_uvia', 'll', '🌧️'], ['llave', '_ave', 'll', '🔑'], ['llama', '_ama', 'll', '🦙'], ['llegar', '_egar', 'll', ''],
+        ['llorar', '_orar', 'll', '😢'], ['lleno', '_eno', 'll', ''], ['llevar', '_evar', 'll', ''], ['llamar', '_amar', 'll', '📞'],
+        ['calle', 'ca_e', 'll', '🛣️'], ['gallina', 'ga_ina', 'll', '🐔'], ['galleta', 'ga_eta', 'll', '🍪'], ['botella', 'bote_a', 'll', ''],
+        ['estrella', 'estre_a', 'll', '⭐'], ['caballo', 'caba_o', 'll', '🐴'], ['toalla', 'toa_a', 'll', ''], ['medalla', 'meda_a', 'll', '🏅'],
+        ['camello', 'came_o', 'll', '🐪'], ['cuello', 'cue_o', 'll', ''], ['sello', 'se_o', 'll', ''], ['huella', 'hue_a', 'll', '👣'],
+        ['pollito', 'po_ito', 'll', '🐤'],
+        ['cuchillo', 'cuchi_o', 'll', '', 'illo'], ['bolsillo', 'bolsi_o', 'll', '👜', 'illo'], ['silla', 'si_a', 'll', '🪑', 'illo'], ['tortilla', 'torti_a', 'll', '🥘', 'illo'],
+        ['ardilla', 'ardi_a', 'll', '🐿️', 'illo'], ['castillo', 'casti_o', 'll', '🏰', 'illo'], ['ladrillo', 'ladri_o', 'll', '🧱', 'illo'], ['cepillo', 'cepi_o', 'll', '🪥', 'illo'],
+        ['rodilla', 'rodi_a', 'll', '🦵', 'illo'], ['bombilla', 'bombi_a', 'll', '💡', 'illo'], ['amarillo', 'amari_o', 'll', '🟡', 'illo'], ['anillo', 'ani_o', 'll', '💍', 'illo'],
+        ['pastilla', 'pasti_a', 'll', '💊', 'illo'], ['mejilla', 'meji_a', 'll', '', 'illo'],
+        ['yogur', '_ogur', 'y', '🥛'], ['yate', '_ate', 'y', '🛥️'], ['yema', '_ema', 'y', '🍳'], ['yoyó', '_oyó', 'y', '🪀'],
+        ['yeso', '_eso', 'y', ''], ['yegua', '_egua', 'y', '🐴'], ['payaso', 'pa_aso', 'y', '🤡'], ['joya', 'jo_a', 'y', '💎'],
+        ['playa', 'pla_a', 'y', '🏖️'], ['ayuda', 'a_uda', 'y', '🆘'], ['mayor', 'ma_or', 'y', ''], ['ayer', 'a_er', 'y', ''],
+        ['mayonesa', 'ma_onesa', 'y', ''], ['inyección', 'in_ección', 'y', '💉'], ['leyenda', 'le_enda', 'y', '📜'], ['ensayo', 'ensa_o', 'y', '']
+      ] },
+
+    { id: 'may', name: 'Mayúsculas', sub: 'Ana, Madrid', kind: 'sentence',
+      rules: {
+        name: 'Los nombres de personas y de mascotas empiezan con mayúscula.',
+        place: 'Los nombres de ciudades, países y ríos empiezan con mayúscula.',
+        start: 'La primera palabra de una frase empieza con mayúscula.',
+        dot: 'Después de un punto se escribe mayúscula.',
+        common: 'Los nombres de cosas y de animales se escriben con minúscula.'
+      },
+      items: [
+        ['Mi amiga se llama Lucía.', 'Mi amiga se llama lucía.', 'name'],
+        ['Pablo juega al fútbol.', 'pablo juega al fútbol.', 'name'],
+        ['Hoy vamos a casa de Marta.', 'Hoy vamos a casa de marta.', 'name'],
+        ['Mi hermano se llama Diego.', 'Mi hermano se llama diego.', 'name'],
+        ['Mi perro se llama Toby.', 'Mi perro se llama toby.', 'name'],
+        ['Sofía lee un cuento.', 'sofía lee un cuento.', 'name'],
+        ['El gato de Laura es negro.', 'El gato de laura es negro.', 'name'],
+        ['Mi profe se llama Carmen.', 'Mi profe se llama carmen.', 'name'],
+        ['Con Hugo juego a las cartas.', 'Con hugo juego a las cartas.', 'name'],
+        ['Hoy es el cumple de Álvaro.', 'Hoy es el cumple de álvaro.', 'name'],
+        ['Mateo y Elena son primos.', 'mateo y elena son primos.', 'name'],
+        ['Mi abuela se llama Rosa.', 'Mi abuela se llama rosa.', 'name'],
+        ['Ayer vi a Nuria en el parque.', 'Ayer vi a nuria en el parque.', 'name'],
+        ['Vivo en Madrid.', 'Vivo en madrid.', 'place'],
+        ['Mis tíos viven en Sevilla.', 'Mis tíos viven en sevilla.', 'place'],
+        ['Este verano vamos a Valencia.', 'Este verano vamos a valencia.', 'place'],
+        ['España está en Europa.', 'españa está en europa.', 'place'],
+        ['Me gusta el mar de Cádiz.', 'Me gusta el mar de cádiz.', 'place'],
+        ['Quiero ir a París.', 'Quiero ir a parís.', 'place'],
+        ['Mi prima vive en Italia.', 'Mi prima vive en italia.', 'place'],
+        ['El río Ebro pasa por Zaragoza.', 'El río ebro pasa por zaragoza.', 'place'],
+        ['Mi abuelo es de Granada.', 'Mi abuelo es de granada.', 'place'],
+        ['Hemos ido a Barcelona.', 'Hemos ido a barcelona.', 'place'],
+        ['Este año vamos a Portugal.', 'Este año vamos a portugal.', 'place'],
+        ['Ayer fui al parque.', 'ayer fui al parque.', 'start'],
+        ['Hoy hace mucho sol.', 'hoy hace mucho sol.', 'start'],
+        ['Me gusta el chocolate.', 'me gusta el chocolate.', 'start'],
+        ['Mi casa es grande.', 'mi casa es grande.', 'start'],
+        ['Por la noche leo un cuento.', 'por la noche leo un cuento.', 'start'],
+        ['Tengo un gato negro.', 'tengo un gato negro.', 'start'],
+        ['Es de noche. Los niños duermen.', 'Es de noche. los niños duermen.', 'dot'],
+        ['Hace frío. Me pongo el abrigo.', 'Hace frío. me pongo el abrigo.', 'dot'],
+        ['Llueve mucho. Cojo el paraguas.', 'Llueve mucho. cojo el paraguas.', 'dot'],
+        ['Tengo sed. Bebo agua.', 'Tengo sed. bebo agua.', 'dot'],
+        ['Mi hermana come pan.', 'Mi hermana come Pan.', 'common'],
+        ['Tengo un perro grande.', 'Tengo un Perro grande.', 'common'],
+        ['En el cole hay una biblioteca.', 'En el cole hay una Biblioteca.', 'common'],
+        ['Veo un pájaro en el árbol.', 'Veo un Pájaro en el Árbol.', 'common'],
+        ['Mi mamá compra fruta.', 'Mi mamá compra Fruta.', 'common'],
+        ['Las vacas comen hierba.', 'Las Vacas comen hierba.', 'common'],
+        ['Vivo en una ciudad grande.', 'Vivo en una Ciudad grande.', 'common']
+      ] }
+  ];
+  /* ===== end DATA ===== */
+
+  const $ = (id) => document.getElementById(id);
+  const MIX = 'mezcla';
+
+  /* ---------- items ---------- */
+
+  const FAMS = DATA.map((f) => {
+    const items = f.items.map((row) => {
+      if (f.kind === 'sentence') {
+        return { id: f.id + ':' + row[0], fam: f.id, kind: 'sentence', good: row[0], bad: row[1], rule: f.rules[row[2]], tag: row[2] };
+      }
+      const answer = row[2], tag = row[4] || (answer === '' ? 'none' : answer);
+      return { id: f.id + ':' + row[0] + ':' + row[1], fam: f.id, kind: 'gap', full: row[0], gapped: row[1], answer, emoji: row[3] || '',
+        choices: f.choices, rule: f.rules[tag], tag };
+    });
+    return { id: f.id, name: f.name, sub: f.sub, kind: f.kind, choices: f.choices, rules: f.rules, items };
+  });
+  const BY_ID = {};
+  FAMS.forEach((f) => f.items.forEach((it) => { BY_ID[it.id] = it; }));
+  const ALL_IDS = Object.keys(BY_ID);
+
+  /* ---------- state ---------- */
+
+  const decks = {};
+  FAMS.forEach((f) => { decks[f.id] = Kit.deck(SLUG, f.items.map((i) => i.id)); });
+  decks[MIX] = Kit.deck(SLUG, ALL_IDS);
+
+  let topic = MIX, queue = [], pos = 0, score = 0, results = [];
+  let mode = 'idle'; // idle | answering | feedback
+  let voiceOn = true, order = [], speakToken = 0;
+
+  const el = { start: $('start'), play: $('play'), dots: $('dots'), msg: $('msg'), word: $('word'), pic: $('pic'), wordrow: $('wordrow'),
+    choices: $('choices'), fb: $('fb'), rule: $('rule'), next: $('next'), say: $('say') };
+
+  const cur = () => queue[pos];
+  const labelOf = (c) => (c === '' ? 'sin h' : c);
+
+  /* ---------- start screen ---------- */
+
+  function showStart() {
+    speakToken++;
+    mode = 'idle';
+    el.play.hidden = true;
+    el.start.hidden = false;
+    const box = $('fams');
+    box.textContent = '';
+    FAMS.concat([{ id: MIX, name: 'Mezcla', sub: 'Todas las pistas juntas', mix: true }]).forEach((f) => {
+      const st = decks[f.id].stats();
+      const li = document.createElement('li');
+      if (f.mix) li.className = 'is-mix';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fam' + (f.mix ? ' is-mix' : '');
+      b.dataset.fam = f.id;
+      const n = document.createElement('span'); n.className = 'fam__name'; n.textContent = (f.mix ? '🎲 ' : '') + f.name;
+      const s = document.createElement('span'); s.className = 'fam__sub'; s.textContent = f.sub;
+      const m = document.createElement('span'); m.className = 'fam__mast'; m.textContent = '🔍 ' + st.mastered + '/' + st.total;
+      m.setAttribute('aria-label', st.mastered + ' de ' + st.total + ' dominadas');
+      b.setAttribute('aria-label', f.name + ', ' + f.sub + '. ' + st.mastered + ' de ' + st.total + ' dominadas');
+      b.appendChild(n); b.appendChild(s); b.appendChild(m);
+      b.addEventListener('click', () => { Kit.sfx('tap'); startRound(f.id); });
+      li.appendChild(b);
+      box.appendChild(li);
+    });
+  }
+
+  /* ---------- round ---------- */
+
+  function startRound(id) {
+    topic = id;
+    voiceOn = Kit.canSpeak('es');
+    queue = decks[id].next(ROUND).map((itemId, i) => ({ it: BY_ID[itemId], orig: i, rep: false }));
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    el.start.hidden = true;
+    el.play.hidden = false;
+    $('say').hidden = !voiceOn;
+    showItem();
+  }
+
+  function renderDots() {
+    el.dots.textContent = '';
+    const q = queue[pos];
+    results.forEach((r, i) => {
+      const d = document.createElement('i');
+      if (r === true) d.className = 'is-done';
+      else if (r === false) d.className = 'is-miss';
+      if (q && !q.rep && q.orig === i) d.classList.add('is-current');
+      el.dots.appendChild(d);
+    });
+  }
+
+  function say(text) { return voiceOn ? Kit.speak(text, 'es') : Promise.resolve(); }
+  const spoken = (it) => (it.kind === 'sentence' ? it.good : it.full);
+  const INSTR = { gap: 'Completa la palabra.', sentence: '¿Cuál está bien escrita?' };
+
+  function renderWord(it, answered) {
+    el.word.textContent = '';
+    const i = it.gapped.indexOf('_');
+    const pre = document.createTextNode(it.gapped.slice(0, i));
+    const slot = document.createElement('span');
+    slot.className = 'slot';
+    if (!answered) slot.classList.add('is-open');
+    else if (it.answer === '') slot.classList.add('is-none');
+    else { slot.classList.add('is-done'); slot.textContent = it.answer; }
+    const post = document.createTextNode(it.gapped.slice(i + 1));
+    el.word.appendChild(pre); el.word.appendChild(slot); el.word.appendChild(post);
+    el.word.setAttribute('aria-label', answered ? it.full : 'Palabra con un hueco: ' + it.gapped.replace('_', ' hueco '));
+  }
+
+  function showItem() {
+    const q = cur(), it = q.it;
+    speakToken++;
+    mode = 'answering';
+    renderDots();
+    el.fb.hidden = true;
+    el.msg.className = 'msg';
+    el.msg.textContent = (q.rep ? 'Otra vez. ' : '') + INSTR[it.kind];
+    el.say.setAttribute('aria-label', 'Escuchar: ' + INSTR[it.kind]);
+    el.choices.textContent = '';
+    el.choices.className = 'choices' + (it.kind === 'sentence' ? ' is-text' : '');
+    if (it.kind === 'gap') {
+      el.wordrow.hidden = false;
+      el.pic.textContent = it.emoji;
+      el.pic.hidden = !it.emoji;
+      renderWord(it, false);
+    } else {
+      el.wordrow.hidden = true;
+    }
+    const opts = it.kind === 'gap' ? it.choices.slice() : [it.good, it.bad];
+    order = Kit.shuffle(opts);
+    el.choices.style.setProperty('--n', order.length);
+    order.forEach((value, idx) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'k-choice';
+      b.dataset.value = value;
+      b.textContent = it.kind === 'gap' ? labelOf(value) : value;
+      b.addEventListener('click', () => { choose(idx); b.blur(); });
+      el.choices.appendChild(b);
+    });
+  }
+
+  function choose(idx) {
+    if (mode !== 'answering') return;
+    const q = cur(), it = q.it;
+    const value = order[idx];
+    const right = value === (it.kind === 'gap' ? it.answer : it.good);
+    mode = 'feedback';
+    const counts = !q.rep;
+
+    Array.prototype.forEach.call(el.choices.children, (b, i) => {
+      b.disabled = true;
+      const isRightBtn = order[i] === (it.kind === 'gap' ? it.answer : it.good);
+      if (isRightBtn) b.classList.add('is-ok');
+      else if (i === idx) b.classList.add('is-ko');
+    });
+
+    if (right) {
+      Kit.sfx('ok');
+      if (counts) { score++; results[q.orig] = true; decks[topic].mark(it.id, true); }
+    } else {
+      Kit.sfx('ko');
+      if (counts) {
+        results[q.orig] = false;
+        decks[topic].mark(it.id, false);
+        const at = Math.min(queue.length, pos + 1 + Kit.randInt(2, 4));
+        queue.splice(at, 0, { it, orig: q.orig, rep: true });
+      }
+    }
+    renderDots();
+
+    if (it.kind === 'gap') { renderWord(it, true); }
+    let title;
+    if (right) title = '✓ ' + Kit.praise();
+    else if (it.kind === 'gap') title = '✗ ' + Kit.encourage() + (it.answer === '' ? ' Sin h.' : ' Va «' + it.answer + '».');
+    else title = '✗ ' + Kit.encourage() + ' Es la que tiene ✓.';
+    el.msg.className = 'msg ' + (right ? 'is-ok' : 'is-ko');
+    el.msg.textContent = title;
+    el.say.setAttribute('aria-label', 'Escuchar ' + (it.kind === 'gap' ? 'la palabra' : 'la frase'));
+    el.rule.textContent = it.rule;
+    el.fb.hidden = false;
+    el.next.focus({ preventScroll: true });
+    say(spoken(it));
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    speakToken++;
+    pos++;
+    if (pos >= queue.length) finish(); else showItem();
+  }
+
+  /* ---------- result ---------- */
+
+  function finish() {
+    mode = 'idle';
+    const extra = document.createElement('div');
+    extra.setAttribute('aria-hidden', 'true');
+    extra.style.fontSize = '48px';
+    extra.textContent = '🔍';
+    Kit.result({ slug: SLUG, score, total: ROUND, extra, onAgain: () => startRound(topic),
+      actions: [{ label: 'Elegir pista', onClick: showStart }] });
+  }
+
+  /* ---------- wiring ---------- */
+
+  el.next.addEventListener('click', next);
+  el.say.addEventListener('click', () => {
+    if (mode === 'idle') return;
+    const it = cur().it;
+    if (mode === 'feedback') say(spoken(it));
+    else say(INSTR[it.kind] + (it.kind === 'gap' ? ' ' + it.full : ''));
+  });
+  $('quit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (el.play.hidden || document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^[1-9]$/.test(e.key) && mode === 'answering') {
+      const i = Number(e.key) - 1;
+      if (i < order.length) { e.preventDefault(); choose(i); }
+    } else if (e.key === 'Enter') {
+      if (document.activeElement && document.activeElement.id === 'quit') return;
+      if (mode === 'feedback') { e.preventDefault(); next(); }
+    }
+  });
+
+  /* ---------- self test (data checks) ---------- */
+
+  function selfTest() {
+    const problems = [];
+    const seen = {};
+    const fulls = {};
+    FAMS.forEach((f) => f.items.forEach((it) => { if (it.kind === 'gap') fulls[it.full] = true; }));
+    FAMS.forEach((f) => {
+      if (f.items.length < 20) problems.push(f.id + ': menos de 20 items (' + f.items.length + ')');
+      f.items.forEach((it) => {
+        const tag = it.id;
+        if (seen[it.id]) problems.push('id repetido: ' + it.id);
+        seen[it.id] = true;
+        if (!it.rule) problems.push(tag + ': falta la regla (' + it.tag + ')');
+        if (it.kind === 'gap') {
+          const gaps = (it.gapped.match(/_/g) || []).length;
+          if (gaps !== 1) problems.push(tag + ': debe tener exactamente un hueco');
+          if (f.choices.indexOf(it.answer) < 0) problems.push(tag + ': la respuesta no está entre las opciones');
+          if (new Set(f.choices).size !== f.choices.length) problems.push(f.id + ': opciones repetidas');
+          if (it.gapped.replace('_', it.answer) !== it.full) problems.push(tag + ': la palabra completa no coincide');
+          if (it.full.length > 12) problems.push(tag + ': palabra demasiado larga');
+          if (it.full !== it.full.toLowerCase()) problems.push(tag + ': debe estar en minúsculas');
+          f.choices.forEach((c) => {
+            if (c !== it.answer && fulls[it.gapped.replace('_', c)]) problems.push(tag + ': otra opción también da una palabra del juego');
+          });
+        } else {
+          if (it.good === it.bad) problems.push(tag + ': las dos frases son iguales');
+          if (it.good.toLowerCase() !== it.bad.toLowerCase()) problems.push(tag + ': las frases solo deben cambiar en mayúsculas');
+          if (it.good.length > 40) problems.push(tag + ': frase demasiado larga');
+        }
+      });
+    });
+    return problems;
+  }
+
+  Kit.mount({ slug: SLUG, title: 'Detective de letras' });
+  Kit.ready.then(showStart);
+
+  // Hooks for the automated checks (not used by the game itself).
+  window.__detective = { FAMS, DATA, decks, selfTest, ROUND, startRound, showStart, choose, next,
+    peek(id) { startRound(MIX); queue = [{ it: BY_ID[id], orig: 0, rep: false }]; pos = 0; showItem(); },
+    get state() { return { topic, pos, mode, score, order: order.slice(), queue: queue.map((q) => q.it.id + (q.rep ? '*' : '')) }; } };
+})();
+</script>
+</body>
+</html>
