@@ -17,11 +17,11 @@
     background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--accent); cursor: pointer;
     touch-action: manipulation; -webkit-user-select: none; user-select: none;
   }
-  .lvl:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
-  .lvl:disabled { border-color: var(--line); box-shadow: none; background: #efeae0; color: var(--muted); cursor: not-allowed; }
+  .lvl:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lvl.is-locked { border-color: var(--line); box-shadow: none; background: #efeae0; color: var(--muted); cursor: pointer; }
   .lvl__n { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
             display: grid; place-items: center; font-size: 24px; font-weight: 900; }
-  .lvl:disabled .lvl__n { background: #cfc6b4; color: #fff; }
+  .lvl.is-locked .lvl__n { background: #cfc6b4; color: #fff; }
   .lvl__t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .lvl__name { font-size: 22px; font-weight: 900; line-height: 1.15; }
   .lvl__sub { font-size: 20px; font-weight: 600; color: var(--muted); line-height: 1.2; }
@@ -340,7 +340,7 @@
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'lvl';
-      b.disabled = !open;
+      if (!open) b.classList.add('is-locked');
       b.dataset.level = L.n;
       b.innerHTML = '<span class="lvl__n"></span><span class="lvl__t"><span class="lvl__name"></span><span class="lvl__sub"></span></span><span class="lvl__side"></span>';
       b.querySelector('.lvl__n').textContent = L.n;

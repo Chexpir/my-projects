@@ -21,8 +21,8 @@
     box-shadow: 0 4px 0 var(--accent); cursor: pointer; font-size: 26px; font-weight: 900; line-height: 1.1;
     touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
   }
-  .lv:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
-  .lv:disabled { border-color: var(--line); background: #efeae0; box-shadow: none; color: var(--muted); cursor: not-allowed; }
+  .lv:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lv.is-locked { border-color: var(--line); background: #efeae0; box-shadow: none; color: var(--muted); cursor: pointer; }
   .lv.is-next { background: var(--accent); color: var(--on-accent); }
   .lv .k-stars { font-size: 16px; gap: 0; }
   .lv.is-next .k-stars .off { color: rgba(255, 255, 255, 0.55); }
@@ -341,7 +341,7 @@
         b.type = 'button';
         b.className = 'lv' + (next && next.n === l.n ? ' is-next' : '');
         const open = isOpen(l.n);
-        b.disabled = !open;
+        if (!open) b.classList.add('is-locked');
         b.setAttribute('aria-label', 'Nivel ' + l.n + (open ? ', ' + (stars[l.n] || 0) + ' de 3 estrellas' : ', cerrado'));
         const num = document.createElement('span');
         num.textContent = l.n;
