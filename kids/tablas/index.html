@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Tablas mágicas: aprende y practica las tablas de multiplicar.">
+<meta name="theme-color" content="#fff8ec">
+<title>Tablas mágicas</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .menu { display: flex; flex-direction: column; gap: 8px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0; text-align: center; color: var(--muted); font-weight: 700; }
+  .tables { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .tb {
+    min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 6px 12px; text-align: left;
+    border: 3px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink);
+    box-shadow: 0 4px 0 var(--line); cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .tb:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--line); }
+  .tb[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); box-shadow: 0 4px 0 rgba(0, 0, 0, .25); }
+  .tb__n { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+           background: var(--accent); color: var(--on-accent); font-size: 26px; font-weight: 900; }
+  .tb[aria-pressed="true"] .tb__n { background: var(--on-accent); color: var(--accent); }
+  .tb__t { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+  .tb__name { font-size: 20px; font-weight: 800; white-space: nowrap; }
+  .tb .k-stars { font-size: 20px; gap: 2px; }
+  .tb[aria-pressed="true"] .k-stars .off { color: rgba(255, 255, 255, .55); }
+  .tb[aria-pressed="true"] .k-stars .on { color: #ffe27a; }
+  .tb__check { flex: none; font-size: 24px; font-weight: 900; width: 1ch; }
+  .go-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .go-row { flex-wrap: nowrap; gap: 8px; }
+  .go-row .k-btn { flex: 1 1 0; min-width: 0; padding: 0 8px; font-size: 20px; }
+
+  .play { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .play-top { display: flex; align-items: center; gap: 10px; }
+  .play-top .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .play-top .k-progress { flex: 1; gap: 6px; flex-wrap: nowrap; }
+  .play-top .k-progress > i { width: 16px; height: 16px; border-width: 3px; flex: none; }
+  .q-card { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; }
+  .q-card.is-ok { background: var(--ok-bg); border-color: var(--ok); }
+  .q-card.is-ko { background: var(--ko-bg); border-color: var(--ko); }
+  .eq {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .25em;
+    font-size: clamp(34px, 10vw, 64px); font-weight: 900; line-height: 1.2; font-variant-numeric: tabular-nums;
+  }
+  .eq .op { color: var(--muted); }
+  .box {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 1.7em; padding: 0 .15em; height: 1.35em;
+    border-radius: 12px; border: 3px solid var(--accent); background: #fff;
+  }
+  .box.is-ok { border-color: var(--ok); color: var(--ok); }
+  .box.is-ko { border-color: var(--ko); color: var(--ko); }
+  .box.is-ok::after { content: "\2713"; font-size: .7em; margin-left: .15em; }
+  .box.is-ko::after { content: "\2717"; font-size: .7em; margin-left: .15em; }
+  .box:empty::before { content: "\2009"; }
+  .say { flex: none; align-self: flex-start; min-width: 56px; min-height: 56px; border-radius: 50%; border: 2px solid var(--line);
+         background: var(--card); font-size: 26px; cursor: pointer; touch-action: manipulation; }
+
+  .dock { display: grid; }
+  .dock > * { grid-area: 1 / 1; }
+  .fb { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+  .fb__title { font-size: 28px; font-weight: 900; }
+  .fb__title.is-ok { color: var(--ok); }
+  .fb__title.is-ko { color: var(--ko); }
+  .fb__eq { font-size: 34px; font-weight: 900; }
+
+  /* dot grid: rows x columns */
+  .grid { --d: clamp(10px, calc((100dvh - 470px) / 10), 22px); display: grid; gap: 3px; justify-content: center;
+          grid-template-columns: repeat(var(--cols), var(--d)); }
+  .grid i { width: var(--d); height: var(--d); border-radius: 50%; background: var(--accent); display: block; }
+  .grid i.alt { background: #3d7de0; }
+  .grid--learn { --d: clamp(12px, min(calc((100vw - 80px) / 10.5), calc((100dvh - 400px) / 10.5)), 34px); }
+  .grid--learn i.new { animation: pop .35s ease-out; }
+  @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+
+  .learn { gap: 10px; }
+  .learn .l-fact { font-size: clamp(36px, 11vw, 64px); font-weight: 900; text-align: center; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .learn .l-say { font-size: 20px; color: var(--muted); font-weight: 700; text-align: center; margin: 0; }
+  .learn .l-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; flex: 1; min-height: 0; }
+  .learn .l-btns { display: flex; gap: 8px; }
+  .learn .l-btns .k-btn { flex: 1; min-width: 0; padding: 0 8px; font-size: 22px; white-space: nowrap; }
+  .learn .l-btns .k-btn--big { flex: 2; }
+  .full { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 14px; font-size: clamp(22px, 5.5vw, 30px); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .full span { text-align: left; white-space: nowrap; }
+  .l-title { margin: 0; text-align: center; font-size: 26px; font-weight: 900; }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir tablas">
+    <div class="menu">
+      <h2>¿Qué tablas quieres?</h2>
+      <p>Toca una o varias.</p>
+      <div id="tables" class="tables" role="group" aria-label="Tablas"></div>
+      <div class="go-row">
+        <button type="button" class="k-btn k-btn--ghost" id="all">Todas</button>
+        <button type="button" class="k-btn" id="learn" disabled>Aprender</button>
+        <button type="button" class="k-btn" id="practice" disabled>Practicar</button>
+      </div>
+    </div>
+  </main>
+
+  <main class="k-screen learn" id="learnScreen" hidden aria-label="Aprender">
+    <div class="play-top">
+      <button type="button" class="k-btn k-btn--ghost" id="lquit" aria-label="Volver a las tablas">‹ Tablas</button>
+      <div class="k-progress" id="ldots" aria-hidden="true"></div>
+    </div>
+    <div class="k-card l-card" id="lcard">
+      <div class="l-fact" id="lfact" role="status" aria-live="polite"></div>
+      <p class="l-say" id="lsay"></p>
+      <div class="grid grid--learn" id="lgrid"></div>
+    </div>
+    <div class="l-btns">
+      <button type="button" class="k-btn k-btn--ghost" id="lback">‹ Antes</button>
+      <button type="button" class="k-btn" id="lhear" aria-label="Escuchar otra vez">🔊</button>
+      <button type="button" class="k-btn k-btn--big" id="lnext">Siguiente</button>
+    </div>
+  </main>
+
+  <main class="k-screen learn" id="summary" hidden aria-label="Tabla completa">
+    <h2 class="l-title" id="sum-title"></h2>
+    <div class="k-card l-card"><div class="full" id="full"></div></div>
+    <div class="l-btns">
+      <button type="button" class="k-btn k-btn--ghost" id="sback">‹ Repasar</button>
+      <button type="button" class="k-btn k-btn--ghost" id="snext" hidden>Siguiente tabla</button>
+      <button type="button" class="k-btn k-btn--big" id="spractice">Practicar</button>
+    </div>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="play-top">
+      <button type="button" class="k-btn k-btn--ghost" id="quit" aria-label="Volver a las tablas">‹ Tablas</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+    <div class="k-card q-card" id="qcard">
+      <div class="eq" id="eq" role="img"></div>
+      <button type="button" class="say" id="say" aria-label="Escuchar la pregunta">🔊</button>
+    </div>
+    <div class="dock">
+      <div class="k-numpad" id="pad"></div>
+      <div class="fb" id="fb" hidden role="status" aria-live="polite">
+        <div class="fb__title" id="fb-title"></div>
+        <div class="fb__eq" id="fb-eq"></div>
+        <div class="grid" id="fb-grid" aria-hidden="true"></div>
+        <button type="button" class="k-btn k-btn--big" id="next">Siguiente</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA (edit here) ===== */
+  const SLUG = 'tablas';
+  const ROUND = 10;
+  // Order in which the tables are taught and shown.
+  const TABLE_ORDER = [2, 5, 10, 4, 3, 6, 9, 8, 7, 1];
+  /* ===== end DATA ===== */
+
+  const $ = (id) => document.getElementById(id);
+  const TIMES = '×';
+
+  /* ---------- helpers ---------- */
+
+  const factId = (t, n) => t + 'x' + n;
+  const tableIds = (t) => Array.from({ length: 10 }, (_, i) => factId(t, i + 1));
+  const ALL_IDS = [].concat(...TABLE_ORDER.map(tableIds));
+  const parseId = (id) => { const p = id.split('x'); return { t: +p[0], n: +p[1] }; };
+
+  const UNITS = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce', 'trece',
+    'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve', 'veinte', 'veintiuno', 'veintidós', 'veintitrés',
+    'veinticuatro', 'veinticinco', 'veintiséis', 'veintisiete', 'veintiocho', 'veintinueve'];
+  const TENS = { 3: 'treinta', 4: 'cuarenta', 5: 'cincuenta', 6: 'sesenta', 7: 'setenta', 8: 'ochenta', 9: 'noventa' };
+  function words(n) {
+    if (n < 30) return UNITS[n];
+    if (n === 100) return 'cien';
+    const t = Math.floor(n / 10), u = n % 10;
+    return u ? TENS[t] + ' y ' + UNITS[u] : TENS[t];
+  }
+  const speechOf = (t, n) => words(t) + ' por ' + words(n) + ', ' + words(t * n);
+  const askOf = (t, n) => '¿Cuánto es ' + words(t) + ' por ' + words(n) + '?';
+  const factText = (t, n) => t + ' ' + TIMES + ' ' + n + ' = ' + (t * n);
+
+  // t rows of n dots. Returns the element; every dot is real so tests can count them.
+  function dotGrid(el, t, n, newCol) {
+    el.textContent = '';
+    el.style.setProperty('--cols', n);
+    el.style.setProperty('--rows', t);
+    el.setAttribute('aria-label', t + ' filas de ' + n + ' puntos');
+    for (let r = 0; r < t; r++) {
+      for (let c = 0; c < n; c++) {
+        const d = document.createElement('i');
+        if (r % 2) d.className = 'alt';
+        if (newCol && c === n - 1) d.classList.add('new');
+        el.appendChild(d);
+      }
+    }
+    return el;
+  }
+
+  /* ---------- state ---------- */
+
+  const store = Kit.store(SLUG);
+  const selected = new Set();
+
+  const el = { start: $('start'), learn: $('learnScreen'), summary: $('summary'), play: $('play'),
+               eq: $('eq'), card: $('qcard'), pad: $('pad'), fb: $('fb'), dots: $('dots') };
+  const screens = ['start', 'learn', 'summary', 'play'];
+  function show(name) { screens.forEach((s) => { el[s].hidden = s !== name; }); }
+  const chosen = () => TABLE_ORDER.filter((t) => selected.has(t));
+
+  /* ---------- start screen ---------- */
+
+  function masteryStars(t) {
+    const m = Kit.deck(SLUG, tableIds(t)).stats().mastered;
+    return Math.floor(m * 3 / 10);
+  }
+
+  function showStart() {
+    mode = 'idle';
+    show('start');
+    const box = $('tables');
+    box.textContent = '';
+    TABLE_ORDER.forEach((t) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tb';
+      b.dataset.table = t;
+      b.setAttribute('aria-pressed', selected.has(t) ? 'true' : 'false');
+      b.innerHTML = '<span class="tb__n"></span><span class="tb__t"><span class="tb__name"></span></span><span class="tb__check" aria-hidden="true"></span>';
+      b.querySelector('.tb__n').textContent = t;
+      b.querySelector('.tb__name').textContent = 'del ' + t;
+      b.querySelector('.tb__t').appendChild(Kit.stars.el(masteryStars(t), 3));
+      b.querySelector('.tb__check').textContent = selected.has(t) ? '✓' : '';
+      b.addEventListener('click', () => {
+        Kit.sfx('tap');
+        if (selected.has(t)) selected.delete(t); else selected.add(t);
+        b.setAttribute('aria-pressed', selected.has(t) ? 'true' : 'false');
+        b.querySelector('.tb__check').textContent = selected.has(t) ? '✓' : '';
+        syncButtons();
+      });
+      box.appendChild(b);
+    });
+    syncButtons();
+  }
+  function syncButtons() {
+    const none = selected.size === 0;
+    $('learn').disabled = none;
+    $('practice').disabled = none;
+    $('all').textContent = selected.size === TABLE_ORDER.length ? 'Ninguna' : 'Todas';
+  }
+
+  /* ---------- aprender ---------- */
+
+  let learnList = [], li = 0, step = 1;
+
+  function startLearn() {
+    learnList = chosen();
+    if (!learnList.length) return;
+    li = 0; step = 1;
+    show('learn');
+    renderStep(true);
+  }
+
+  function renderStep(say) {
+    const t = learnList[li];
+    $('lfact').textContent = factText(t, step);
+    $('lsay').textContent = words(t) + ' por ' + words(step) + ', ' + words(t * step);
+    dotGrid($('lgrid'), t, step, step > 1);
+    $('lback').disabled = step === 1;
+    $('lnext').textContent = step === 10 ? 'Ver la tabla' : 'Siguiente';
+    const dots = $('ldots');
+    dots.textContent = '';
+    for (let i = 1; i <= 10; i++) {
+      const d = document.createElement('i');
+      if (i < step) d.className = 'is-done';
+      else if (i === step) d.className = 'is-current';
+      dots.appendChild(d);
+    }
+    if (say) Kit.speak(speechOf(t, step), 'es');
+  }
+
+  function learnNext() {
+    Kit.sfx('tap');
+    if (step < 10) { step++; renderStep(true); } else showSummary();
+  }
+  function learnBack() {
+    if (step > 1) { Kit.sfx('tap'); step--; renderStep(true); }
+  }
+
+  function showSummary() {
+    const t = learnList[li];
+    show('summary');
+    $('sum-title').textContent = 'La tabla del ' + t;
+    const full = $('full');
+    full.textContent = '';
+    for (let n = 1; n <= 10; n++) { const s = document.createElement('span'); s.textContent = factText(t, n); full.appendChild(s); }
+    $('snext').hidden = li >= learnList.length - 1;
+    Kit.speak('Esta es la tabla del ' + words(t), 'es');
+  }
+
+  /* ---------- practicar ---------- */
+
+  let deck = null, queue = [], pos = 0, score = 0, results = [], typed = '', mode = 'idle'; // idle | answering | feedback
+
+  function startPractice() {
+    const ts = chosen();
+    if (!ts.length) return;
+    const ids = [].concat(...ts.map(tableIds));
+    deck = Kit.deck(SLUG, ids);
+    queue = deck.next(ROUND).map((id, i) => ({ id, ...parseId(id), orig: i, rep: false }));
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    show('play');
+    showQuestion();
+  }
+
+  function renderDots() {
+    el.dots.textContent = '';
+    const cur = queue[pos];
+    results.forEach((r, i) => {
+      const d = document.createElement('i');
+      if (r === true) d.className = 'is-done';
+      else if (r === false) d.className = 'is-miss';
+      if (cur && !cur.rep && cur.orig === i) d.classList.add('is-current');
+      el.dots.appendChild(d);
+    });
+  }
+
+  function span(cls, text) { const s = document.createElement('span'); if (cls) s.className = cls; s.textContent = text; return s; }
+
+  function renderEq(stateCls) {
+    const q = queue[pos];
+    el.eq.textContent = '';
+    const b = span('box' + (stateCls ? ' ' + stateCls : ''), typed);
+    b.id = 'box';
+    [span('', q.t), span('op', TIMES), span('', q.n), span('op', '='), b].forEach((p) => el.eq.appendChild(p));
+    el.eq.setAttribute('aria-label', q.t + ' por ' + q.n + ' igual a ?');
+    el.card.classList.toggle('is-ok', stateCls === 'is-ok');
+    el.card.classList.toggle('is-ko', stateCls === 'is-ko');
+  }
+
+  function showQuestion() {
+    mode = 'answering';
+    typed = '';
+    renderDots();
+    renderEq('');
+    el.fb.hidden = true;
+    el.pad.hidden = false;
+    updateGo();
+    Kit.speak(askOf(queue[pos].t, queue[pos].n), 'es');
+  }
+
+  function updateGo() { const go = el.pad.querySelector('.k-numpad__go'); if (go) go.disabled = typed === ''; }
+  function press(d) {
+    if (mode !== 'answering') return;
+    Kit.sfx('tap');
+    if (typed === '0') typed = '';
+    if (typed.length < 3) typed += d;
+    renderEq(''); updateGo();
+  }
+  function erase() {
+    if (mode !== 'answering') return;
+    Kit.sfx('tap');
+    typed = typed.slice(0, -1);
+    renderEq(''); updateGo();
+  }
+
+  function check() {
+    if (mode !== 'answering' || typed === '') return;
+    const item = queue[pos];
+    const right = parseInt(typed, 10) === item.t * item.n;
+    mode = 'feedback';
+    renderEq(right ? 'is-ok' : 'is-ko');
+    el.pad.hidden = true;
+    el.fb.hidden = false;
+    const title = $('fb-title');
+    title.className = 'fb__title ' + (right ? 'is-ok' : 'is-ko');
+    if (right) {
+      Kit.sfx('ok');
+      title.textContent = '✓ ' + Kit.praise();
+      $('fb-eq').textContent = '';
+      $('fb-grid').textContent = '';
+      $('fb-grid').hidden = true;
+      if (!item.rep) { score++; results[item.orig] = true; deck.mark(item.id, true); }
+    } else {
+      Kit.sfx('ko');
+      title.textContent = '✗ ' + Kit.encourage();
+      $('fb-eq').textContent = factText(item.t, item.n);
+      $('fb-grid').hidden = false;
+      dotGrid($('fb-grid'), item.t, item.n);
+      Kit.speak(speechOf(item.t, item.n), 'es');
+      if (!item.rep) {
+        results[item.orig] = false;
+        deck.mark(item.id, false);
+        const at = Math.min(queue.length, pos + 1 + Kit.randInt(2, 4));
+        queue.splice(at, 0, { id: item.id, t: item.t, n: item.n, orig: item.orig, rep: true });
+      }
+    }
+    renderDots();
+    $('next').focus({ preventScroll: true });
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    pos++;
+    if (pos >= queue.length) finish(); else showQuestion();
+  }
+
+  function finish() {
+    mode = 'idle';
+    Kit.result({
+      slug: SLUG, score, total: ROUND,
+      actions: [{ label: 'Elegir tablas', onClick: showStart }],
+      onAgain: startPractice
+    });
+  }
+
+  /* ---------- wiring ---------- */
+
+  '123456789'.split('').concat(['del', '0', 'go']).forEach((k) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    if (k === 'del') { b.textContent = 'borrar'; b.className = 'k-numpad__del'; b.addEventListener('click', erase); }
+    else if (k === 'go') { b.textContent = 'comprobar'; b.className = 'k-numpad__go'; b.addEventListener('click', check); }
+    else { b.textContent = k; b.addEventListener('click', () => press(k)); }
+    el.pad.appendChild(b);
+  });
+
+  $('all').addEventListener('click', () => {
+    Kit.sfx('tap');
+    if (selected.size === TABLE_ORDER.length) selected.clear(); else TABLE_ORDER.forEach((t) => selected.add(t));
+    showStart();
+  });
+  $('learn').addEventListener('click', () => { Kit.sfx('tap'); startLearn(); });
+  $('practice').addEventListener('click', () => { Kit.sfx('tap'); startPractice(); });
+  $('lquit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+  $('lnext').addEventListener('click', learnNext);
+  $('lback').addEventListener('click', learnBack);
+  $('lhear').addEventListener('click', () => Kit.speak(speechOf(learnList[li], step), 'es'));
+  $('sback').addEventListener('click', () => { Kit.sfx('tap'); show('learn'); renderStep(false); });
+  $('snext').addEventListener('click', () => { Kit.sfx('tap'); li++; step = 1; show('learn'); renderStep(true); });
+  $('spractice').addEventListener('click', () => {
+    Kit.sfx('tap');
+    // Practise the table just learnt together with the rest of her selection.
+    startPractice();
+  });
+  $('next').addEventListener('click', next);
+  $('say').addEventListener('click', () => { if (queue[pos]) Kit.speak(askOf(queue[pos].t, queue[pos].n), 'es'); });
+  $('quit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (el.play.hidden || document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^[0-9]$/.test(e.key)) { e.preventDefault(); press(e.key); }
+    else if (e.key === 'Backspace') { e.preventDefault(); erase(); }
+    else if (e.key === 'Enter') {
+      if (document.activeElement && document.activeElement.id === 'quit') return;
+      e.preventDefault();
+      if (mode === 'answering') check(); else if (mode === 'feedback') next();
+    }
+  });
+
+  Kit.mount({ slug: SLUG, title: 'Tablas mágicas' });
+  Kit.ready.then(showStart);
+
+  // Hooks for the automated checks (not used by the game itself).
+  window.__tablas = { ALL_IDS, TABLE_ORDER, tableIds, words, speechOf, factText, dotGrid, masteryStars };
+})();
+</script>
+</body>
+</html>

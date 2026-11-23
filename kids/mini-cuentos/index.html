@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Minicuentos: lee un cuento corto y responde cinco preguntas.">
+<meta name="theme-color" content="#fff8ec">
+<title>Minicuentos</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .menu { display: flex; flex-direction: column; gap: 10px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0; text-align: center; color: var(--muted); font-weight: 700; }
+  .lvl {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 8px 14px;
+    text-align: left; border: 3px solid var(--accent); border-radius: var(--radius);
+    background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--accent); cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .lvl:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lvl__e { flex: none; font-size: 36px; line-height: 1; }
+  .lvl__t { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+  .lvl__name { font-size: 24px; font-weight: 900; }
+  .lvl__sub { font-size: 20px; font-weight: 600; color: var(--muted); }
+  .lvl__side { flex: none; font-size: 20px; font-weight: 800; text-align: right; }
+  .lvl__bar { display: flex; gap: 3px; margin-top: 4px; }
+  .lvl__bar i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); background: var(--card); display: block; }
+  .lvl__bar i.on { background: var(--ok); border-color: var(--ok); }
+
+  .bar { display: flex; align-items: center; gap: 10px; }
+  .bar .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .bar .k-progress { flex: 1; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; }
+  .bar .k-progress > i { width: 16px; height: 16px; border-width: 3px; flex: none; }
+
+  .k-app.is-playing { height: 100vh; height: 100dvh; }
+  .read, .quiz { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .story { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .story__top { display: flex; align-items: center; gap: 10px; }
+  .story__emoji { font-size: 34px; letter-spacing: 4px; line-height: 1.1; flex: none; }
+  .story__title { margin: 0; font-size: 24px; font-weight: 900; line-height: 1.15; }
+  .story__text { margin: 0; font-size: clamp(20px, 5.4vw, 28px); line-height: 1.5; font-weight: 600; }
+  .sn { border-radius: 8px; padding: 1px 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .sn.is-reading { background: #ffe9a6; text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 4px; }
+  .sn.is-answer { background: var(--ok-bg); box-shadow: 0 0 0 3px var(--ok); font-weight: 800; }
+  .banner { margin: 0; padding: 10px 12px; border-radius: 14px; background: var(--ok-bg); border: 2px solid var(--ok); font-size: 20px; font-weight: 800; }
+  .row { display: flex; gap: 8px; }
+  .row .k-btn { flex: 1; min-width: 0; padding: 0 12px; white-space: nowrap; }
+  .row .k-btn--big { flex: 1 1 0; font-size: 24px; padding: 0 8px; }
+  .row .k-btn--ghost { flex: none; }
+
+  .q-card { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; }
+  .q-card h2 { flex: 1; margin: 0; font-size: clamp(22px, 5.8vw, 28px); font-weight: 900; line-height: 1.2; }
+  .say { flex: none; min-width: 56px; min-height: 56px; border-radius: 50%; border: 2px solid var(--line);
+         background: var(--card); font-size: 26px; cursor: pointer; touch-action: manipulation; }
+  .opts { display: flex; flex-direction: column; gap: 8px; }
+  .opts .k-choice { justify-content: flex-start; text-align: left; font-size: clamp(22px, 5.6vw, 28px); line-height: 1.15; min-height: 64px; padding: 8px 14px; }
+  .opts .k-choice:disabled { cursor: default; }
+  .dock { display: grid; margin-top: auto; }
+  .dock > * { grid-area: 1 / 1; }
+  .fb { display: flex; flex-direction: column; gap: 6px; text-align: center; align-items: stretch; }
+  .fb__title { font-size: 26px; font-weight: 900; }
+  .fb__title.is-ok { color: var(--ok); }
+  .fb__title.is-ko { color: var(--ko); }
+  .fb__ans { font-size: 20px; font-weight: 800; margin: 0; }
+  .again { width: 100%; }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir cuentos">
+    <div class="menu">
+      <h2>¡Vamos a leer!</h2>
+      <p>Elige cuánto quieres leer.</p>
+      <div id="levels" class="menu"></div>
+    </div>
+  </main>
+
+  <main class="k-screen read" id="read" hidden aria-label="Cuento">
+    <div class="bar">
+      <button type="button" class="k-btn k-btn--ghost" id="rquit" aria-label="Volver a los cuentos">‹ Cuentos</button>
+    </div>
+    <p class="banner" id="banner" hidden></p>
+    <div class="k-card story" id="story">
+      <div class="story__top"><span class="story__emoji" id="s-emoji" aria-hidden="true"></span><h2 class="story__title" id="s-title"></h2></div>
+      <p class="story__text" id="s-text"></p>
+    </div>
+    <div class="row">
+      <button type="button" class="k-btn k-btn--ghost" id="listen">🔊 Escuchar</button>
+      <button type="button" class="k-btn k-btn--big" id="done">Ya lo he leído</button>
+    </div>
+  </main>
+
+  <main class="k-screen quiz" id="quiz" hidden aria-label="Preguntas">
+    <div class="bar">
+      <button type="button" class="k-btn k-btn--ghost" id="qquit" aria-label="Volver a los cuentos">‹ Cuentos</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+    <div class="k-card q-card">
+      <h2 id="qtext"></h2>
+      <button type="button" class="say" id="say" aria-label="Escuchar la pregunta">🔊</button>
+    </div>
+    <div class="opts" id="opts"></div>
+    <div class="dock">
+      <button type="button" class="k-btn k-btn--ghost again" id="reread">📖 Volver a leer</button>
+      <div class="fb" id="fb" hidden role="status" aria-live="polite">
+        <div class="fb__title" id="fb-title"></div>
+        <p class="fb__ans" id="fb-ans" hidden></p>
+        <button type="button" class="k-btn k-btn--big" id="next">Siguiente</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: stories (edit here) =====
+     len: 's' (30-40 words), 'm' (50-60), 'l' (70-90).
+     text: the sentences of the story. qs: five questions, one of each kind:
+       lit (literal), ord (order), why (reason), feel (feeling), voc (vocabulary).
+     ok: the right option. bad: two wrong options. s: index in `text` of the sentence that holds the answer. */
+  const STORIES = [
+    /* ---- cortos ---- */
+    { id: 'nube', len: 's', title: 'Nube, la gata', emoji: ['🐱', '🌧️', '🏠'],
+      text: ['Nube es una gata blanca.', 'Hoy llueve mucho y no puede salir al jardín.', 'Se sube a la ventana y mira las gotas de lluvia.', 'Después se echa en su cama y se duerme.', 'Está muy contenta en casa.'],
+      qs: [
+        { k: 'lit', q: '¿Cómo es Nube?', ok: 'Una gata blanca', bad: ['Un gato negro', 'Un perro blanco'], s: 0 },
+        { k: 'ord', q: '¿Qué hace Nube después de mirar las gotas?', ok: 'Se duerme', bad: ['Sale al jardín', 'Come pescado'], s: 3 },
+        { k: 'why', q: '¿Por qué no sale Nube al jardín?', ok: 'Porque llueve mucho', bad: ['Porque está enferma', 'Porque no quiere'], s: 1 },
+        { k: 'feel', q: '¿Cómo está Nube en casa?', ok: 'Contenta', bad: ['Enfadada', 'Asustada'], s: 4 },
+        { k: 'voc', q: '¿Qué son las gotas de lluvia?', ok: 'Trocitos de agua', bad: ['Hojas del jardín', 'Piedras pequeñas'], s: 2 }
+      ] },
+    { id: 'mochila', len: 's', title: 'La mochila nueva', emoji: ['🎒', '✏️', '⭐'],
+      text: ['Ana tiene una mochila nueva.', 'Es azul y tiene una estrella.', 'Guarda dentro su estuche con lápices y su libro.', 'Mañana la llevará al colegio.', 'Ana sonríe porque le gusta mucho.'],
+      qs: [
+        { k: 'lit', q: '¿De qué color es la mochila?', ok: 'Azul', bad: ['Roja', 'Verde'], s: 1 },
+        { k: 'ord', q: '¿Qué hará Ana después de guardar sus cosas?', ok: 'Llevará la mochila al colegio', bad: ['Se irá al parque', 'Comprará otra mochila'], s: 3 },
+        { k: 'why', q: '¿Por qué sonríe Ana?', ok: 'Porque le gusta su mochila', bad: ['Porque hoy no hay cole', 'Porque pierde un lápiz'], s: 4 },
+        { k: 'feel', q: '¿Cómo se siente Ana?', ok: 'Alegre', bad: ['Triste', 'Cansada'], s: 4 },
+        { k: 'voc', q: '¿Qué es un estuche?', ok: 'Una caja para guardar lápices', bad: ['Una prenda de abrigo', 'Un tipo de libro'], s: 2 }
+      ] },
+    { id: 'pan-abuelo', len: 's', title: 'El pan del abuelo', emoji: ['👴', '🍞', '👧'],
+      text: ['El abuelo Pepe hace pan por la mañana.', 'Mezcla harina, agua y sal para hacer la masa.', 'Luego la deja descansar.', 'Cuando el pan sale del horno, huele muy bien.', 'Su nieta lo prueba y dice que está riquísimo.'],
+      qs: [
+        { k: 'lit', q: '¿Qué mezcla el abuelo?', ok: 'Harina, agua y sal', bad: ['Leche y azúcar', 'Huevos y queso'], s: 1 },
+        { k: 'ord', q: '¿Qué hace el abuelo después de mezclar?', ok: 'Deja descansar la masa', bad: ['Saca el pan del horno', 'Prueba el pan'], s: 2 },
+        { k: 'why', q: '¿Por qué huele tan bien?', ok: 'Porque el pan sale del horno', bad: ['Porque hay flores', 'Porque hace sol'], s: 3 },
+        { k: 'feel', q: '¿Qué siente la nieta al probar el pan?', ok: 'Le gusta mucho', bad: ['Le da asco', 'Tiene miedo'], s: 4 },
+        { k: 'voc', q: '¿Qué es la masa?', ok: 'Lo que se mezcla para hacer pan', bad: ['El horno donde se cuece', 'El nombre de la niña'], s: 1 }
+      ] },
+    { id: 'luna', len: 's', title: 'La luna de Mía', emoji: ['🌕', '⭐', '🛏️'],
+      text: ['Esta noche la luna está grande y redonda.', 'Mía la mira desde su ventana porque no puede dormir.', 'Cuenta diez estrellas pequeñas a su lado.', 'Se siente feliz y tranquila.', 'Al final cierra los ojos y sueña con volar.'],
+      qs: [
+        { k: 'lit', q: '¿Qué cuenta Mía?', ok: 'Diez estrellas', bad: ['Diez nubes', 'Diez pájaros'], s: 2 },
+        { k: 'ord', q: '¿Qué hace Mía al final?', ok: 'Cierra los ojos y sueña', bad: ['Sale al jardín', 'Cuenta ovejas'], s: 4 },
+        { k: 'why', q: '¿Por qué mira Mía la luna?', ok: 'Porque no puede dormir', bad: ['Porque tiene frío', 'Porque se ha perdido'], s: 1 },
+        { k: 'feel', q: '¿Cómo se siente Mía?', ok: 'Feliz y tranquila', bad: ['Muy enfadada', 'Con mucho miedo'], s: 3 },
+        { k: 'voc', q: '¿Qué quiere decir «redonda»?', ok: 'Con forma de círculo', bad: ['Con forma de cuadrado', 'Muy pequeña'], s: 0 }
+      ] },
+    { id: 'partido', len: 's', title: 'El partido del patio', emoji: ['⚽', '🏃', '🥅'],
+      text: ['Hoy hay partido de fútbol en el patio.', 'Leo corre rápido y chuta fuerte, pero el balón da en el poste.', 'Sus amigos le animan: «¡La próxima será!».', 'Leo sonríe y vuelve a correr.'],
+      qs: [
+        { k: 'lit', q: '¿Dónde es el partido?', ok: 'En el patio', bad: ['En la playa', 'En el parque'], s: 0 },
+        { k: 'ord', q: '¿Qué pasa justo después del chut?', ok: 'El balón da en el poste', bad: ['Leo marca un gol', 'Leo se va a casa'], s: 1 },
+        { k: 'why', q: '¿Por qué vuelve a correr Leo?', ok: 'Porque sus amigos le animan', bad: ['Porque ha marcado', 'Porque acaba el partido'], s: 2 },
+        { k: 'feel', q: '¿Cómo se siente Leo al final?', ok: 'Animado', bad: ['Muy enfadado', 'Aburrido'], s: 3 },
+        { k: 'voc', q: '¿Qué significa «chutar»?', ok: 'Dar una patada fuerte al balón', bad: ['Coger el balón con las manos', 'Contar los goles'], s: 1 }
+      ] },
+    { id: 'manzana', len: 's', title: 'La manzana roja', emoji: ['🍎', '🐦', '🌳'],
+      text: ['En el frutal hay una manzana roja.', 'Un pajarito se posa en la rama y prueba un poquito.', '¡Qué dulce está!', 'Llama a sus amigos para compartirla.', 'Comen todos juntos y muy contentos.'],
+      qs: [
+        { k: 'lit', q: '¿De qué color es la manzana?', ok: 'Roja', bad: ['Verde', 'Amarilla'], s: 0 },
+        { k: 'ord', q: '¿Qué hace el pajarito después de probarla?', ok: 'Llama a sus amigos', bad: ['Se va volando solo', 'Planta una semilla'], s: 3 },
+        { k: 'why', q: '¿Por qué llama a sus amigos?', ok: 'Para compartir la manzana', bad: ['Para que se la lleven', 'Porque tiene miedo'], s: 3 },
+        { k: 'feel', q: '¿Cómo están todos al comer?', ok: 'Contentos', bad: ['Tristes', 'Enfadados'], s: 4 },
+        { k: 'voc', q: '¿Qué es una rama?', ok: 'Una parte del árbol', bad: ['Una fruta pequeña', 'Una casita de madera'], s: 1 }
+      ] },
+    { id: 'rio', len: 's', title: 'El río cantarín', emoji: ['🏞️', '🐸', '🌊'],
+      text: ['El río baja de la montaña cantando.', 'Pasa entre piedras y por eso suena como una canción.', 'Una rana salta sobre una hoja grande.', 'Al final el río llega al mar y descansa, tranquilo y azul.'],
+      qs: [
+        { k: 'lit', q: '¿Dónde salta la rana?', ok: 'Sobre una hoja grande', bad: ['Sobre una piedra', 'Dentro del mar'], s: 2 },
+        { k: 'ord', q: '¿Qué pasa al final del recorrido?', ok: 'El río llega al mar', bad: ['El río se seca', 'El río vuelve a la montaña'], s: 3 },
+        { k: 'why', q: '¿Por qué suena el río como una canción?', ok: 'Porque pasa entre piedras', bad: ['Porque hay pájaros', 'Porque llueve fuerte'], s: 1 },
+        { k: 'feel', q: '¿Cómo está el río al final?', ok: 'Tranquilo', bad: ['Enfadado', 'Asustado'], s: 3 },
+        { k: 'voc', q: '¿Qué significa «descansa»?', ok: 'Se queda en calma', bad: ['Corre más rápido', 'Se hace pequeño'], s: 3 }
+      ] },
+    { id: 'cumple', len: 's', title: 'La tarta de Sara', emoji: ['🎂', '🕯️', '🎈'],
+      text: ['Hoy es el cumpleaños de Sara.', 'Su familia le prepara una tarta con ocho velas.', 'Sara pide un deseo y sopla muy fuerte.', 'Todas las velas se apagan.', 'Sara está muy feliz y abraza a todos.'],
+      qs: [
+        { k: 'lit', q: '¿Cuántas velas tiene la tarta?', ok: 'Ocho', bad: ['Seis', 'Diez'], s: 1 },
+        { k: 'ord', q: '¿Qué hace Sara antes de soplar?', ok: 'Pide un deseo', bad: ['Abraza a todos', 'Corta la tarta'], s: 2 },
+        { k: 'why', q: '¿Por qué se apagan las velas?', ok: 'Porque Sara sopla fuerte', bad: ['Porque hace viento', 'Porque se acaba la tarta'], s: 2 },
+        { k: 'feel', q: '¿Cómo se siente Sara?', ok: 'Muy feliz', bad: ['Muy triste', 'Con sueño'], s: 4 },
+        { k: 'voc', q: '¿Qué es un deseo?', ok: 'Algo que quieres que pase', bad: ['Un regalo envuelto', 'Una vela grande'], s: 2 }
+      ] },
+
+    /* ---- medianos ---- */
+    { id: 'erizo', len: 'm', title: 'El erizo Tito', emoji: ['🦔', '🍂', '🍄'],
+      text: ['Tito es un erizo pequeño que vive bajo un árbol.', 'Una mañana de otoño sale a buscar comida.', 'Encuentra bellotas, moras y una seta roja.', 'Las guarda con cuidado entre sus púas, que parecen agujas.', 'Cuando vuelve a casa con tanta comida, su madre se alegra mucho.', 'Esa noche comen juntos y Tito se duerme calentito.'],
+      qs: [
+        { k: 'lit', q: '¿Dónde vive Tito?', ok: 'Bajo un árbol', bad: ['En una cueva', 'En un río'], s: 0 },
+        { k: 'ord', q: '¿Qué hace Tito después de encontrar la comida?', ok: 'La guarda entre sus púas', bad: ['Se queda dormido', 'Llama a su madre'], s: 3 },
+        { k: 'why', q: '¿Por qué se alegra su madre?', ok: 'Porque Tito trae mucha comida', bad: ['Porque Tito se ha perdido', 'Porque empieza a llover'], s: 4 },
+        { k: 'feel', q: '¿Cómo se siente Tito al dormirse?', ok: 'A gusto y calentito', bad: ['Con frío', 'Con hambre'], s: 5 },
+        { k: 'voc', q: '¿Qué son las púas?', ok: 'Puntas duras como agujas', bad: ['Hojas secas', 'Patas muy cortas'], s: 3 }
+      ] },
+    { id: 'musica', len: 'm', title: 'La clase de música', emoji: ['🥁', '🎶', '👩‍🏫'],
+      text: ['Hoy la clase de música es especial porque la maestra trae una caja llena de instrumentos.', 'Marcos elige el tambor y Julia, una flauta dulce.', 'Primero tocan despacio y luego más deprisa.', 'Al final suena una canción preciosa.', 'Los niños se miran y se ríen de alegría.', 'Esa tarde la maestra les dice que lo han hecho muy bien.'],
+      qs: [
+        { k: 'lit', q: '¿Qué instrumento elige Julia?', ok: 'Una flauta', bad: ['Un tambor', 'Una guitarra'], s: 1 },
+        { k: 'ord', q: '¿Cómo tocan primero?', ok: 'Despacio', bad: ['Deprisa', 'Muy fuerte'], s: 2 },
+        { k: 'why', q: '¿Por qué es especial la clase?', ok: 'Porque hay instrumentos', bad: ['Porque no hay maestra', 'Porque salen al patio'], s: 0 },
+        { k: 'feel', q: '¿Cómo están los niños al final?', ok: 'Alegres', bad: ['Tristes', 'Enfadados'], s: 4 },
+        { k: 'voc', q: '¿Qué significa «preciosa»?', ok: 'Muy bonita', bad: ['Muy ruidosa', 'Muy larga'], s: 3 }
+      ] },
+    { id: 'playa', len: 'm', title: 'Un día de playa', emoji: ['🏖️', '🏰', '🌊'],
+      text: ['El sábado la familia de Nico va a la playa.', 'Papá lleva la sombrilla y mamá, las toallas.', 'Nico y su hermana construyen un castillo de arena.', 'De pronto llega una ola grande y derriba el castillo.', 'Se ríen y empiezan otro más alto.', 'Al atardecer, vuelven a casa cansados y felices.'],
+      qs: [
+        { k: 'lit', q: '¿Qué lleva papá?', ok: 'La sombrilla', bad: ['Las toallas', 'El castillo'], s: 1 },
+        { k: 'ord', q: '¿Qué hacen después de que cae el castillo?', ok: 'Empiezan otro castillo', bad: ['Vuelven a casa', 'Se van a comer'], s: 4 },
+        { k: 'why', q: '¿Por qué se cae el castillo?', ok: 'Porque llega una ola grande', bad: ['Porque hay mucho viento', 'Porque lo pisa papá'], s: 3 },
+        { k: 'feel', q: '¿Cómo vuelven a casa?', ok: 'Cansados y felices', bad: ['Enfadados y tristes', 'Asustados'], s: 5 },
+        { k: 'voc', q: '¿Qué es el atardecer?', ok: 'El final del día', bad: ['La hora de despertarse', 'La noche más oscura'], s: 5 }
+      ] },
+    { id: 'semilla', len: 'm', title: 'La semilla de Lucía', emoji: ['🌱', '🪴', '💧'],
+      text: ['Lucía planta una semilla en una maceta.', 'Cada día le pone un poco de agua.', 'Durante muchos días no pasa nada.', 'Lucía espera con paciencia y no se rinde.', 'Una mañana aparece un tallo verde muy pequeño.', 'Lucía da saltos de alegría y llama a su abuela para enseñárselo.', 'Las dos miran la planta y sonríen juntas.'],
+      qs: [
+        { k: 'lit', q: '¿Dónde planta Lucía la semilla?', ok: 'En una maceta', bad: ['En el huerto', 'En una caja de zapatos'], s: 0 },
+        { k: 'ord', q: '¿Qué hace Lucía antes de ver el tallo?', ok: 'Riega la semilla cada día', bad: ['Llama a su abuela', 'Salta de alegría'], s: 1 },
+        { k: 'why', q: '¿Por qué llama a su abuela?', ok: 'Para enseñarle el tallo', bad: ['Para pedirle agua', 'Porque tiene miedo'], s: 5 },
+        { k: 'feel', q: '¿Cómo se siente Lucía al ver el tallo?', ok: 'Muy contenta', bad: ['Aburrida', 'Preocupada'], s: 5 },
+        { k: 'voc', q: '¿Qué significa «paciencia»?', ok: 'Esperar con calma', bad: ['Correr muy deprisa', 'Gritar muy fuerte'], s: 3 }
+      ] },
+    { id: 'cohete-carton', len: 'm', title: 'El cohete de cartón', emoji: ['🚀', '📦', '🪐'],
+      text: ['Óscar construye un cohete con cajas de cartón.', 'Se pone un casco de bicicleta y sube dentro.', 'Cuenta hacia atrás: tres, dos, uno.', 'En su imaginación, el cohete despega y pasa entre las estrellas.', 'Allí saluda a un planeta de color morado.', 'Cuando su madre lo llama a cenar, vuelve a la Tierra con una gran sonrisa.'],
+      qs: [
+        { k: 'lit', q: '¿Con qué construye Óscar el cohete?', ok: 'Con cajas de cartón', bad: ['Con madera', 'Con latas'], s: 0 },
+        { k: 'ord', q: '¿Qué hace Óscar justo antes de despegar?', ok: 'Cuenta hacia atrás', bad: ['Saluda a un planeta', 'Cena con su madre'], s: 2 },
+        { k: 'why', q: '¿Por qué vuelve a la Tierra?', ok: 'Porque su madre lo llama a cenar', bad: ['Porque se rompe el cohete', 'Porque tiene miedo'], s: 5 },
+        { k: 'feel', q: '¿Cómo está Óscar al final?', ok: 'Contento', bad: ['Enfadado', 'Asustado'], s: 5 },
+        { k: 'voc', q: '¿Para qué sirve un casco?', ok: 'Para proteger la cabeza', bad: ['Para ver mejor', 'Para calentar los pies'], s: 1 }
+      ] },
+    { id: 'piscina', len: 'm', title: 'Primer día de natación', emoji: ['🏊', '🛟', '👏'],
+      text: ['Hoy es el primer día de natación de Irene.', 'Tiene un poco de miedo porque el agua es muy profunda.', 'El monitor le da un flotador y le dice que respire con calma.', 'Irene mueve las piernas y los brazos.', 'Poco a poco avanza hasta el otro lado.', 'Allí todos aplauden y ella se siente muy orgullosa.'],
+      qs: [
+        { k: 'lit', q: '¿Qué le da el monitor a Irene?', ok: 'Un flotador', bad: ['Unas gafas', 'Una toalla'], s: 2 },
+        { k: 'ord', q: '¿Qué hace Irene después de mover piernas y brazos?', ok: 'Avanza hasta el otro lado', bad: ['Sale corriendo', 'Se pone el flotador'], s: 4 },
+        { k: 'why', q: '¿Por qué tiene miedo Irene?', ok: 'Porque el agua es profunda', bad: ['Porque hace frío', 'Porque está sola'], s: 1 },
+        { k: 'feel', q: '¿Cómo se siente al final?', ok: 'Orgullosa', bad: ['Avergonzada', 'Aburrida'], s: 5 },
+        { k: 'voc', q: '¿Qué significa «aplauden»?', ok: 'Dan palmadas para felicitar', bad: ['Se van a casa', 'Cantan una canción'], s: 5 }
+      ] },
+    { id: 'sopa', len: 'm', title: 'La sopa de la abuela', emoji: ['🍲', '🥕', '👵'],
+      text: ['Es un día de frío y el abuelo tose un poco, así que la abuela prepara una sopa caliente.', 'Corta zanahorias, patatas y un puerro.', 'Lo echa todo en la olla con agua y un poco de sal.', 'Cuando está lista, huele a casa.', 'El abuelo se toma el plato entero y se siente mejor.'],
+      qs: [
+        { k: 'lit', q: '¿Qué prepara la abuela?', ok: 'Una sopa', bad: ['Un pastel', 'Una tortilla'], s: 0 },
+        { k: 'ord', q: '¿Qué hace la abuela después de cortar las verduras?', ok: 'Las echa en la olla', bad: ['Las come crudas', 'Las tira'], s: 2 },
+        { k: 'why', q: '¿Por qué prepara sopa?', ok: 'Porque hace frío y el abuelo tose', bad: ['Porque es un cumpleaños', 'Porque no hay pan'], s: 0 },
+        { k: 'feel', q: '¿Cómo se siente el abuelo al final?', ok: 'Mejor', bad: ['Peor', 'Enfadado'], s: 4 },
+        { k: 'voc', q: '¿Qué es una olla?', ok: 'Un recipiente para cocinar', bad: ['Una cuchara grande', 'Un tipo de verdura'], s: 2 }
+      ] },
+    { id: 'loro', len: 'm', title: 'El loro Kiwi', emoji: ['🦜', '🍌', '😄'],
+      text: ['Kiwi es un loro verde que repite todo lo que oye.', 'Un día oye a Eva decir: «¡Qué hambre!».', 'Kiwi lo repite una y otra vez.', 'Todos se ríen en la cocina.', 'Eva le da un trozo de fruta para que haga silencio un rato.', 'Kiwi come feliz y por fin se queda callado.'],
+      qs: [
+        { k: 'lit', q: '¿De qué color es Kiwi?', ok: 'Verde', bad: ['Rojo', 'Amarillo'], s: 0 },
+        { k: 'ord', q: '¿Qué pasa después de que Kiwi repite la frase?', ok: 'Todos se ríen', bad: ['Kiwi se escapa', 'Eva se enfada'], s: 3 },
+        { k: 'why', q: '¿Por qué le da Eva fruta?', ok: 'Para que haga silencio', bad: ['Porque es su cumpleaños', 'Porque se ha caído'], s: 4 },
+        { k: 'feel', q: '¿Cómo está Kiwi al comer?', ok: 'Feliz', bad: ['Triste', 'Asustado'], s: 5 },
+        { k: 'voc', q: '¿Qué significa «repetir»?', ok: 'Decir otra vez lo mismo', bad: ['Cantar muy bajito', 'Dormir de pie'], s: 0 }
+      ] },
+
+    /* ---- largos ---- */
+    { id: 'pinguino', len: 'l', title: 'El pingüino Pipo', emoji: ['🐧', '🐟', '🧊'],
+      text: ['Pipo es un pingüino que vive en un lugar muy frío.', 'Un día ve un pez plateado en el agua y se tira para atraparlo.', 'Pipo se cansa y vuelve a la orilla, donde empieza el hielo.', 'Sus amigos están allí y le ofrecen un trozo de su pescado.', 'Pipo no quiere aceptarlo porque se siente un poco triste.', 'Entonces su mejor amigo le dice: «Mañana lo intentaremos juntos».', 'Al día siguiente pescan tres peces entre todos.', 'Esa noche Pipo se duerme muy feliz.'],
+      qs: [
+        { k: 'lit', q: '¿Cómo era el pez que vio Pipo?', ok: 'Plateado', bad: ['Dorado', 'Negro'], s: 1 },
+        { k: 'ord', q: '¿Qué hace Pipo justo después de cansarse?', ok: 'Vuelve a la orilla', bad: ['Atrapa el pez', 'Se duerme'], s: 2 },
+        { k: 'why', q: '¿Por qué no quiere aceptar el pescado?', ok: 'Porque está un poco triste', bad: ['Porque es muy pequeño', 'Porque ya ha comido'], s: 4 },
+        { k: 'feel', q: '¿Cómo se siente Pipo al final?', ok: 'Feliz', bad: ['Enfadado', 'Triste'], s: 7 },
+        { k: 'voc', q: '¿Qué es la orilla?', ok: 'El borde del agua', bad: ['El fondo del mar', 'Una casa de hielo'], s: 2 }
+      ] },
+    { id: 'museo', len: 'l', title: 'La excursión al museo', emoji: ['🚌', '🦖', '🪨'],
+      text: ['Hoy la clase va de excursión al museo de ciencias.', 'Todos llevan una mochila con su almuerzo y una botella de agua.', 'En el museo ven un esqueleto, es decir, todos los huesos, de un dinosaurio muy grande.', 'Pedro se queda con la boca abierta al verlo.', 'Luego los niños tocan piedras de muchos colores.', 'Clara encuentra una piedra roja y brillante.', 'Antes de irse, todos dibujan su animal favorito en una hoja.', 'Al volver a casa, Pedro y Clara cuentan todo lo que han aprendido.'],
+      qs: [
+        { k: 'lit', q: '¿Qué ven en el museo?', ok: 'Un esqueleto de dinosaurio', bad: ['Un barco de verdad', 'Un elefante vivo'], s: 2 },
+        { k: 'ord', q: '¿Qué hacen antes de irse del museo?', ok: 'Dibujan su animal favorito', bad: ['Comen el almuerzo', 'Cantan en el autobús'], s: 6 },
+        { k: 'why', q: '¿Por qué se queda Pedro con la boca abierta?', ok: 'Porque el dinosaurio es enorme', bad: ['Porque tiene hambre', 'Porque se cae'], s: 3 },
+        { k: 'feel', q: '¿Cómo se siente Pedro al ver el dinosaurio?', ok: 'Sorprendido', bad: ['Aburrido', 'Enfadado'], s: 3 },
+        { k: 'voc', q: '¿Qué es un esqueleto?', ok: 'Todos los huesos de un animal', bad: ['La piel de un animal', 'Un libro de ciencias'], s: 2 }
+      ] },
+    { id: 'casa-arbol', len: 'l', title: 'La casa del árbol', emoji: ['🌳', '🔨', '🏡'],
+      text: ['Papá y los dos hermanos quieren construir una casa en el árbol del jardín.', 'El sábado van a la tienda a comprar tablas de madera y clavos.', 'Papá mide las tablas y Marta le pasa los clavos, que sirven para unir la madera.', 'A mediodía están tan cansados que se sientan a comer bocadillos.', 'Por la tarde ponen el techo y una escalera de cuerda.', 'Cuando terminan, los tres suben a mirar el jardín desde arriba.', 'Marta dice que es el mejor lugar del mundo.'],
+      qs: [
+        { k: 'lit', q: '¿Qué compran en la tienda?', ok: 'Tablas y clavos', bad: ['Pintura y cuerda', 'Bocadillos y agua'], s: 1 },
+        { k: 'ord', q: '¿Qué ponen después de comer?', ok: 'El techo y la escalera', bad: ['Las tablas', 'Los bocadillos'], s: 4 },
+        { k: 'why', q: '¿Por qué se sientan a comer a mediodía?', ok: 'Porque están cansados', bad: ['Porque llueve', 'Porque ya han terminado'], s: 3 },
+        { k: 'feel', q: '¿Qué piensa Marta de la casa?', ok: 'Que es el mejor lugar', bad: ['Que da miedo', 'Que es aburrida'], s: 6 },
+        { k: 'voc', q: '¿Para qué sirven los clavos?', ok: 'Para unir la madera', bad: ['Para pintar', 'Para cortar tablas'], s: 2 }
+      ] },
+    { id: 'tormenta', len: 'l', title: 'El día de la tormenta', emoji: ['⛈️', '🐰', '🌈'],
+      text: ['Hoy el cielo está lleno de nubes grises.', 'De repente cae una gota, y luego otra, y luego muchas.', 'Una familia de conejos corre a esconderse en su madriguera, su casa bajo la tierra.', 'Fuera se oye un trueno muy fuerte.', 'La conejita pequeña tiene miedo y se tapa las orejas, pero mamá la abraza.', 'Poco a poco la lluvia se hace más suave.', 'Cuando sale el sol, aparece un arcoíris sobre el prado.', 'Los conejos salen a verlo, contentos y con las patas mojadas.'],
+      qs: [
+        { k: 'lit', q: '¿Dónde se esconden los conejos?', ok: 'En su madriguera', bad: ['Bajo un árbol', 'Dentro de una casa'], s: 2 },
+        { k: 'ord', q: '¿Qué pasa cuando la lluvia se hace suave?', ok: 'Sale el sol y aparece un arcoíris', bad: ['Vuelve el trueno', 'Los conejos se duermen'], s: 6 },
+        { k: 'why', q: '¿Por qué se tapa las orejas la conejita?', ok: 'Por el ruido del trueno', bad: ['Porque tiene frío', 'Porque quiere dormir'], s: 3 },
+        { k: 'feel', q: '¿Cómo se siente la conejita con la tormenta?', ok: 'Con miedo', bad: ['Aburrida', 'Orgullosa'], s: 4 },
+        { k: 'voc', q: '¿Qué es una madriguera?', ok: 'La casa de los conejos', bad: ['Un árbol muy alto', 'Un charco grande'], s: 2 }
+      ] },
+    { id: 'astronauta', len: 'l', title: 'Vera y las estrellas', emoji: ['👩‍🚀', '🔭', '🪐'],
+      text: ['Vera sueña con ser astronauta desde que era muy pequeña.', 'Todas las noches mira el cielo con un telescopio, para ver las estrellas de cerca.', 'Un día, su maestra pregunta qué quieren ser de mayores.', 'Vera levanta la mano y dice que quiere viajar a Marte.', 'La maestra le cuenta que para ser astronauta hay que estudiar mucho.', 'Vera decide aprender cada día algo nuevo sobre el espacio.', 'Esa tarde saca un libro de la biblioteca sobre los planetas.', 'Lo lee entero y se acuesta con una gran sonrisa.'],
+      qs: [
+        { k: 'lit', q: '¿Qué quiere ser Vera de mayor?', ok: 'Astronauta', bad: ['Maestra', 'Doctora'], s: 3 },
+        { k: 'ord', q: '¿Qué hace Vera esa tarde?', ok: 'Saca un libro de la biblioteca', bad: ['Se ríe de sus compañeros', 'Compra un telescopio'], s: 6 },
+        { k: 'why', q: '¿Por qué decide Vera aprender cada día?', ok: 'Porque hay que estudiar mucho', bad: ['Porque tiene deberes', 'Porque se lo piden sus amigos'], s: 4 },
+        { k: 'feel', q: '¿Cómo se siente Vera al final?', ok: 'Feliz e ilusionada', bad: ['Avergonzada', 'Enfadada'], s: 7 },
+        { k: 'voc', q: '¿Qué es un telescopio?', ok: 'Un aparato para ver las estrellas', bad: ['Un libro de cuentos', 'Una nave espacial'], s: 1 }
+      ] },
+    { id: 'bicis', len: 'l', title: 'La carrera de bicis', emoji: ['🚲', '🏅', '🍦'],
+      text: ['Hoy hay una carrera de bicicletas en el parque.', 'Hugo espera en la salida y a su lado está Nora, su vecina, con una bici amarilla.', 'Alguien grita «¡Ya!» y todos empiezan a pedalear.', 'Hugo va el primero, pero en la curva se le cae la cadena.', 'Nora pasa a su lado y se detiene para ayudarle.', 'Le ayuda a colocar la cadena y siguen juntos hasta la meta.', 'El monitor les da una medalla por ser buenos compañeros.', 'Hugo y Nora se van contentos, comiendo un helado.'],
+      qs: [
+        { k: 'lit', q: '¿De qué color es la bici de Nora?', ok: 'Amarilla', bad: ['Roja', 'Azul'], s: 1 },
+        { k: 'ord', q: '¿Qué pasa justo después de caerse la cadena?', ok: 'Nora se detiene a ayudar', bad: ['Hugo gana la carrera', 'Nora se va sin parar'], s: 4 },
+        { k: 'why', q: '¿Por qué reciben una medalla?', ok: 'Por ser buenos compañeros', bad: ['Por llegar los primeros', 'Por tener la bici más bonita'], s: 6 },
+        { k: 'feel', q: '¿Cómo se van Hugo y Nora?', ok: 'Contentos', bad: ['Tristes', 'Enfadados'], s: 7 },
+        { k: 'voc', q: '¿Qué significa «pedalear»?', ok: 'Mover los pedales con los pies', bad: ['Pintar la bici', 'Tocar el timbre'], s: 2 }
+      ] },
+    { id: 'mercado', len: 'l', title: 'La tortilla de Elena', emoji: ['🛒', '🥚', '🍳'],
+      text: ['Los domingos, Elena va al mercado con su padre.', 'Hoy necesitan huevos y patatas para una tortilla.', 'El frutero les regala una mandarina para probar.', 'Elena la pela y reparte los gajos con su padre.', 'Después compran los huevos a una señora muy simpática.', 'Ella los guarda en una bolsa de tela para que no se rompan.', 'En casa, Elena ayuda a pelar las patatas.', 'Su padre fríe todo y da la vuelta a la tortilla.', 'Cuando se la comen, Elena dice que es la mejor del mundo.'],
+      qs: [
+        { k: 'lit', q: '¿Qué les regala el frutero?', ok: 'Una mandarina', bad: ['Una manzana', 'Un huevo'], s: 2 },
+        { k: 'ord', q: '¿Qué hace Elena al llegar a casa?', ok: 'Ayuda a pelar las patatas', bad: ['Va al mercado', 'Compra los huevos'], s: 6 },
+        { k: 'why', q: '¿Por qué guardan los huevos en una bolsa de tela?', ok: 'Para que no se rompan', bad: ['Para que no se mojen', 'Para que no se enfríen'], s: 5 },
+        { k: 'feel', q: '¿Cómo se siente Elena al comer la tortilla?', ok: 'Muy contenta', bad: ['Preocupada', 'Con ganas de llorar'], s: 8 },
+        { k: 'voc', q: '¿Qué son los gajos?', ok: 'Los trozos de una mandarina', bad: ['Las semillas', 'La cáscara'], s: 3 }
+      ] },
+    { id: 'patito', len: 'l', title: 'El patito perdido', emoji: ['🦆', '🦋', '🐸'],
+      text: ['En un estanque, un lugar con agua tranquila, vive una familia de cinco patitos.', 'Un día, un patito sigue unas mariposas y se aleja entre las cañas.', 'Cuando se da cuenta, ya no ve a su familia.', 'El patito se pone muy nervioso y llora bajito.', 'Una rana lo oye y se acerca de un salto.', '«No llores, te ayudo a buscar», le dice con una sonrisa.', 'Oyen un «¡cuac!» muy conocido y allí está toda la familia.', 'Mamá pata abraza al patito y da las gracias.'],
+      qs: [
+        { k: 'lit', q: '¿Cuántos patitos tiene la familia?', ok: 'Cinco', bad: ['Tres', 'Siete'], s: 0 },
+        { k: 'ord', q: '¿Qué hace el patito antes de perderse?', ok: 'Sigue unas mariposas', bad: ['Habla con la rana', 'Llama a mamá pata'], s: 1 },
+        { k: 'why', q: '¿Por qué llora el patito?', ok: 'Porque no ve a su familia', bad: ['Porque tiene hambre', 'Porque se va la rana'], s: 2 },
+        { k: 'feel', q: '¿Cómo se siente el patito cuando está perdido?', ok: 'Nervioso', bad: ['Contento', 'Aburrido'], s: 3 },
+        { k: 'voc', q: '¿Qué es un estanque?', ok: 'Un lugar con agua donde nadan patos', bad: ['Un árbol con nidos', 'Un camino de arena'], s: 0 }
+      ] }
+  ];
+
+  const LEVELS = [
+    { len: 's', name: 'Cuentos cortos', emoji: '🐣', sub: 'Unas pocas frases' },
+    { len: 'm', name: 'Cuentos medianos', emoji: '🐥', sub: 'Un poco más largos' },
+    { len: 'l', name: 'Cuentos largos', emoji: '🦉', sub: 'Para lectores valientes' }
+  ];
+  /* ===== end DATA ===== */
+
+  const SLUG = 'mini-cuentos';
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const BY_ID = Object.fromEntries(STORIES.map((s) => [s.id, s]));
+  const wordCount = (s) => s.text.join(' ').split(/\s+/).filter(Boolean).length;
+
+  /* ---------- state ---------- */
+
+  const store = Kit.store(SLUG);
+  const load = () => store.get({ done: {}, last: '' });
+
+  let story = null, queue = [], pos = 0, score = 0, results = [], mode = 'idle'; // idle | reading | answering | feedback
+  let readMode = 'first'; // first | again | miss
+  let curOpts = [];
+
+  const el = { start: $('start'), read: $('read'), quiz: $('quiz') };
+  function show(name) {
+    ['start', 'read', 'quiz'].forEach((s) => { el[s].hidden = s !== name; });
+    document.querySelector('.k-app').classList.toggle('is-playing', name !== 'start');
+  }
+
+  /* ---------- start screen ---------- */
+
+  function showStart() {
+    stopListen();
+    mode = 'idle';
+    show('start');
+    const s = load();
+    const box = $('levels');
+    box.textContent = '';
+    LEVELS.forEach((L) => {
+      const all = STORIES.filter((x) => x.len === L.len);
+      const done = all.filter((x) => s.done[x.id]).length;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lvl';
+      b.dataset.len = L.len;
+      b.innerHTML = '<span class="lvl__e" aria-hidden="true"></span><span class="lvl__t"><span class="lvl__name"></span><span class="lvl__sub"></span><span class="lvl__bar" aria-hidden="true"></span></span><span class="lvl__side"></span>';
+      b.querySelector('.lvl__e').textContent = L.emoji;
+      b.querySelector('.lvl__name').textContent = L.name;
+      b.querySelector('.lvl__sub').textContent = L.sub;
+      const bar = b.querySelector('.lvl__bar');
+      all.forEach((x) => { const i = document.createElement('i'); if (s.done[x.id]) i.className = 'on'; bar.appendChild(i); });
+      b.querySelector('.lvl__side').textContent = done + ' de ' + all.length;
+      b.setAttribute('aria-label', L.name + ', ' + done + ' de ' + all.length + ' leídos');
+      b.addEventListener('click', () => { Kit.sfx('tap'); startStory(pickStory(L.len)); });
+      box.appendChild(b);
+    });
+  }
+
+  // Stories she has not finished come first. When all are done, any story except the last one played.
+  function pickStory(len) {
+    const s = load();
+    const all = STORIES.filter((x) => x.len === len);
+    let pool = all.filter((x) => !s.done[x.id]);
+    if (!pool.length) pool = all.filter((x) => x.id !== s.last);
+    return Kit.sample(pool.length ? pool : all, 1)[0];
+  }
+
+  /* ---------- story view ---------- */
+
+  function renderStory(highlight) {
+    $('s-emoji').textContent = story.emoji.join(' ');
+    $('s-title').textContent = story.title;
+    const p = $('s-text');
+    p.textContent = '';
+    story.text.forEach((t, i) => {
+      const sp = document.createElement('span');
+      sp.className = 'sn' + (i === highlight ? ' is-answer' : '');
+      sp.dataset.i = i;
+      sp.textContent = t;
+      p.appendChild(sp);
+      p.appendChild(document.createTextNode(' '));
+    });
+    $('story').scrollTop = 0;
+  }
+
+  function startStory(st) {
+    story = st;
+    queue = story.qs.map((q, i) => ({ q, orig: i, rep: false }));
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    openRead('first');
+  }
+
+  function openRead(m, highlight) {
+    stopListen();
+    readMode = m;
+    mode = 'reading';
+    show('read');
+    renderStory(m === 'miss' ? highlight : -1);
+    const banner = $('banner');
+    banner.hidden = m !== 'miss';
+    if (m === 'miss') banner.textContent = '👀 La respuesta está en la frase marcada.';
+    $('done').textContent = m === 'first' ? 'Ya lo he leído' : 'Seguir';
+    $('done').focus({ preventScroll: true });
+    if (m === 'miss') {
+      const a = document.querySelector('#s-text .is-answer');
+      if (a && a.scrollIntoView) a.scrollIntoView({ block: 'center' });
+    }
+  }
+
+  /* "Escuchar": sentence by sentence with the sentence being read highlighted. */
+  let listenToken = 0;
+  function setListenUi(on) { $('listen').textContent = on ? '⏹ Parar' : '🔊 Escuchar'; $('listen').setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  function markReading(i) {
+    document.querySelectorAll('#s-text .sn').forEach((n) => n.classList.toggle('is-reading', +n.dataset.i === i));
+  }
+  function stopListen() {
+    listenToken++;
+    try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+    markReading(-1);
+    setListenUi(false);
+  }
+  async function listen() {
+    const my = ++listenToken;
+    setListenUi(true);
+    for (let i = 0; i < story.text.length; i++) {
+      if (my !== listenToken) return;
+      markReading(i);
+      const n = document.querySelector('#s-text .sn[data-i="' + i + '"]');
+      if (n && n.scrollIntoView) n.scrollIntoView({ block: 'nearest' });
+      const t0 = performance.now();
+      await Kit.speak(story.text[i], 'es', { rate: 0.85 });
+      if (my !== listenToken) return;
+      // No voice (or muted): keep a calm reading pace so the highlight can be followed.
+      if (performance.now() - t0 < 300) await sleep(story.text[i].split(/\s+/).length * 330);
+    }
+    if (my === listenToken) { markReading(-1); setListenUi(false); }
+  }
+
+  /* ---------- questions ---------- */
+
+  function optionsFor(q) {
+    return Kit.shuffle([{ text: q.ok, right: true }].concat(q.bad.map((b) => ({ text: b, right: false }))));
+  }
+
+  function renderDots() {
+    const box = $('dots');
+    box.textContent = '';
+    const cur = queue[pos];
+    results.forEach((r, i) => {
+      const d = document.createElement('i');
+      if (r === true) d.className = 'is-done';
+      else if (r === false) d.className = 'is-miss';
+      if (cur && !cur.rep && cur.orig === i) d.classList.add('is-current');
+      box.appendChild(d);
+    });
+  }
+
+  function showQuestion() {
+    stopListen();
+    mode = 'answering';
+    show('quiz');
+    const item = queue[pos];
+    renderDots();
+    $('qtext').textContent = item.q.q;
+    curOpts = optionsFor(item.q);
+    const box = $('opts');
+    box.textContent = '';
+    curOpts.forEach((o, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'k-choice';
+      b.textContent = o.text;
+      b.dataset.i = i;
+      b.addEventListener('click', () => answer(i));
+      box.appendChild(b);
+    });
+    $('fb').hidden = true;
+    $('reread').hidden = false;
+  }
+
+  function speakQuestion() {
+    const item = queue[pos];
+    if (!item) return;
+    Kit.speak(item.q.q + ' ' + curOpts.map((o) => o.text).join('. ') + '.', 'es');
+  }
+
+  function answer(i) {
+    if (mode !== 'answering') return;
+    const item = queue[pos];
+    const right = curOpts[i].right;
+    mode = 'feedback';
+    const btns = [...$('opts').children];
+    btns.forEach((b, k) => {
+      b.disabled = true;
+      if (curOpts[k].right) b.classList.add('is-ok');
+      else if (k === i) b.classList.add('is-ko');
+    });
+    $('reread').hidden = true;
+    $('fb').hidden = false;
+    const title = $('fb-title');
+    title.className = 'fb__title ' + (right ? 'is-ok' : 'is-ko');
+    const ans = $('fb-ans');
+    if (right) {
+      Kit.sfx('ok');
+      title.textContent = '✓ ' + Kit.praise();
+      ans.hidden = true;
+      $('next').textContent = 'Siguiente';
+      if (!item.rep) { score++; results[item.orig] = true; }
+    } else {
+      Kit.sfx('ko');
+      title.textContent = '✗ ' + Kit.encourage();
+      ans.hidden = false;
+      ans.textContent = 'Era: ' + item.q.ok;
+      $('next').textContent = 'Ver en el cuento';
+      if (!item.rep) {
+        results[item.orig] = false;
+        const at = Math.min(queue.length, pos + 3);
+        queue.splice(at, 0, { q: item.q, orig: item.orig, rep: true });
+      }
+    }
+    renderDots();
+    $('next').focus({ preventScroll: true });
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    const item = queue[pos];
+    const missed = !!$('opts').querySelector('.is-ko');
+    if (missed) { openRead('miss', item.q.s); return; }
+    advance();
+  }
+
+  function advance() {
+    pos++;
+    if (pos >= queue.length) finish(); else showQuestion();
+  }
+
+  /* ---------- result ---------- */
+
+  function finish() {
+    mode = 'idle';
+    const s = load();
+    const n = Kit.stars.calc(score, story.qs.length);
+    const done = Object.assign({}, s.done);
+    done[story.id] = Math.max(done[story.id] || 0, n);
+    store.set({ done, last: story.id });
+
+    const extra = document.createElement('div');
+    extra.className = 'k-center';
+    extra.style.fontSize = '44px';
+    extra.setAttribute('aria-hidden', 'true');
+    extra.textContent = story.emoji.join(' ');
+
+    const len = story.len;
+    const sameStory = story;
+    Kit.result({
+      slug: SLUG, score, total: story.qs.length, extra,
+      actions: [
+        { label: 'Otro cuento', primary: true, onClick: () => startStory(pickStory(len)) },
+        { label: 'Elegir cuentos', onClick: showStart }
+      ],
+      onAgain: () => startStory(sameStory)
+    });
+  }
+
+  /* ---------- wiring ---------- */
+
+  $('listen').addEventListener('click', () => {
+    Kit.sfx('tap');
+    if ($('listen').getAttribute('aria-pressed') === 'true') stopListen(); else listen();
+  });
+  $('done').addEventListener('click', () => {
+    Kit.sfx('tap');
+    stopListen();
+    if (readMode === 'first') showQuestion();
+    else if (readMode === 'again') { show('quiz'); mode = 'answering'; }
+    else advance();
+  });
+  $('reread').addEventListener('click', () => { Kit.sfx('tap'); openRead('again'); });
+  $('next').addEventListener('click', next);
+  $('say').addEventListener('click', speakQuestion);
+  $('rquit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+  $('qquit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (el.quiz.hidden || mode !== 'answering' || document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^[1-3]$/.test(e.key)) { e.preventDefault(); answer(+e.key - 1); }
+  });
+
+  Kit.mount({ slug: SLUG, title: 'Minicuentos' });
+  Kit.ready.then(showStart);
+
+  // Hooks for the automated checks (not used by the game itself).
+  window.__cuentos = { STORIES, LEVELS, wordCount, optionsFor, BY_ID };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Sentence Train: construye frases en inglés con vagones de palabras.">
+<meta name="theme-color" content="#fff8ec">
+<title>Sentence Train</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .menu { display: flex; flex-direction: column; gap: 6px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0 0 4px; text-align: center; color: var(--muted); font-weight: 700; }
+  .lvl {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 3px 12px;
+    text-align: left; border: 3px solid var(--accent); border-radius: var(--radius);
+    background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--accent); cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .lvl:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lvl:disabled { border-color: var(--line); box-shadow: 0 4px 0 var(--line); background: #f6f0e3; cursor: not-allowed; }
+  .lvl__n { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+            display: grid; place-items: center; font-size: 22px; font-weight: 900; }
+  .lvl:disabled .lvl__n { background: var(--line); color: var(--muted); }
+  .lvl__t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .lvl__name { font-size: 22px; font-weight: 900; line-height: 1.1; }
+  .lvl__sub { font-size: 20px; font-weight: 600; color: var(--muted); line-height: 1.1; }
+  .lvl__side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 0; font-size: 20px; font-weight: 800; }
+  .lvl__side .k-stars { font-size: 20px; gap: 2px; }
+  .lock-note { font-size: 20px; }
+  .novoice { margin: 0; padding: 8px 12px; border-radius: 14px; background: #fff3cd; border: 2px solid #f2c200; font-size: 20px; font-weight: 700; text-align: center; }
+
+  .k-app.is-playing { height: 100vh; height: 100dvh; }
+  .play { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .play > * { flex: none; }
+  .play-top { display: flex; align-items: center; gap: 10px; }
+  .play-top .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .play-top .k-progress { flex: 1; gap: 6px; flex-wrap: nowrap; }
+  .play-top .k-progress > i { width: 16px; height: 16px; border-width: 3px; flex: none; }
+
+  .prompt { display: flex; align-items: center; gap: 10px; padding: 6px 10px; min-height: 68px; }
+  .pic { flex: none; min-width: 52px; text-align: center; font-size: 40px; line-height: 1; }
+  .es { flex: 1; min-width: 0; font-size: clamp(21px, 5.8vw, 28px); font-weight: 800; color: var(--ink); line-height: 1.15; overflow-wrap: anywhere; }
+  .say { flex: none; min-width: 56px; min-height: 56px; border-radius: 50%; border: 2px solid var(--line); background: var(--card);
+         font-size: 26px; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .say:active { transform: translateY(2px); }
+
+  .train {
+    display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 8px 10px;
+    padding: 6px 10px 8px; min-height: 72px; border-radius: 16px; background: #f1ead9; border: 2px solid var(--line);
+    box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.07);
+  }
+  .loco { flex: none; font-size: 34px; line-height: 1; }
+  .train__hint { flex: 1; min-width: 0; color: var(--muted); font-size: 20px; font-weight: 700; line-height: 1.2; }
+  .msg { min-height: 28px; text-align: center; font-size: 22px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+  .msg.is-ko { color: var(--ko); }
+  .msg:empty { display: none; }
+
+  .wag {
+    position: relative; min-width: 56px; min-height: 56px; padding: 2px 9px; border: 3px solid #c9bda4;
+    border-radius: 12px; background: var(--card); color: var(--ink); cursor: pointer;
+    font-size: clamp(23px, 6.5vw, 28px); font-weight: 800; line-height: 1.1;
+    box-shadow: 0 4px 0 #c9bda4; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .wag:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 #c9bda4; }
+  .train .wag { border-color: var(--ink); box-shadow: 0 4px 0 var(--ink); }
+  .wag:disabled { cursor: default; }
+  .wag.is-gone { visibility: hidden; }
+  .train .wag::before { content: ""; position: absolute; left: -11px; top: 50%; width: 11px; height: 4px; margin-top: -2px; background: var(--ink); border-radius: 2px; }
+  .train .wag.is-ok { background: var(--ok-bg); border-color: var(--ok); box-shadow: 0 4px 0 var(--ok); }
+  .train .wag.is-ko { background: var(--ko-bg); border-color: var(--ko); border-style: dashed; box-shadow: 0 4px 0 var(--ko); animation: shake 0.45s ease-in-out 1; }
+  .train .wag.is-ok::after, .train .wag.is-ko::after { position: absolute; right: 3px; top: -2px; font-size: 14px; font-weight: 900; line-height: 1; }
+  .train .wag.is-ok::after { content: "\2713"; color: var(--ok); }
+  .train .wag.is-ko::after { content: "\2717"; color: var(--ko); }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+
+  .dock { margin-top: auto; }
+  .pool { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 8px; }
+  #go { width: 100%; font-size: 26px; }
+
+  .fb { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+  .fb__title { font-size: 26px; font-weight: 900; }
+  .fb__title.is-ok { color: var(--ok); }
+  .fb__title.is-ko { color: var(--ko); }
+  .fb__en { font-size: clamp(25px, 7vw, 32px); font-weight: 900; line-height: 1.15; }
+  .fb__es { font-size: 21px; font-weight: 700; color: var(--muted); line-height: 1.2; }
+  .fb__note { font-size: 20px; font-weight: 700; color: var(--muted); }
+  #next { width: 100%; margin-top: 4px; min-height: 60px; }
+  .train-row { font-size: 40px; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="start" aria-label="Elegir nivel">
+    <div class="menu">
+      <h2>¡Elige tu estación!</h2>
+      <p>Sube las palabras al tren y forma la frase en inglés.</p>
+      <div id="levels" class="menu"></div>
+      <p class="lock-note" id="lock-note" hidden>🔒 Gana 2 estrellas en un nivel para abrir el siguiente.</p>
+      <p class="novoice" id="novoice" hidden>Aviso para adultos: este dispositivo no tiene voz en inglés. Verás la frase en español y no habrá audio.</p>
+    </div>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="play-top">
+      <button type="button" class="k-btn k-btn--ghost" id="quit" aria-label="Volver a los niveles">‹ Niveles</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+    <div class="k-card prompt" id="prompt">
+      <div class="pic" id="pic" aria-hidden="true"></div>
+      <div class="es" id="es"></div>
+      <button type="button" class="say" id="say" aria-label="Escuchar la frase en inglés">🔊</button>
+    </div>
+    <div class="train" id="train" role="group" aria-label="Tu tren"></div>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+    <div class="dock">
+      <div id="input">
+        <div class="pool" id="pool" role="group" aria-label="Palabras"></div>
+        <button type="button" class="k-btn k-btn--big" id="go">Comprobar</button>
+      </div>
+      <div class="fb" id="fb" hidden role="status" aria-live="polite">
+        <div class="fb__title" id="fb-title"></div>
+        <div class="fb__en" id="fb-en" lang="en"></div>
+        <div class="fb__es" id="fb-es"></div>
+        <div class="fb__note" id="fb-note"></div>
+        <button type="button" class="k-btn k-btn--big" id="next">Siguiente</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: sentences (edit here) =====
+     [English sentence, picture (emoji), Spanish translation, extra tile (levels 5-7 only)].
+     British English. Each sentence has ONE natural word order: no "A and B" lists, no adverbs that can move,
+     no two nouns that could swap places. Levels 1-3 keep the capital letter and the full stop on the tiles.
+     From level 4 the tiles are lowercase with no punctuation, except "I" and the names in NAMES.
+     The extra tile (levels 5-7) is a word that fits nowhere: and, but, or, of. */
+  const SLUG = 'sentence-train';
+  const ROUND = 8;
+  const NAMES = ['Tom', 'Mia'];
+  const LEVELS = [
+    { n: 1, name: 'Soy y es',       sub: 'It is · I am' },
+    { n: 2, name: 'Me gusta',       sub: 'like · don’t like' },
+    { n: 3, name: 'Tengo',          sub: 'have got · has got' },
+    { n: 4, name: 'Puedo',          sub: 'can · can’t' },
+    { n: 5, name: '¿Dónde está?',   sub: 'in · on · under' },
+    { n: 6, name: 'Preguntas',      sub: 'What · How · Do' },
+    { n: 7, name: '¡Ahora mismo!',  sub: 'She is reading' }
+  ];
+  const DATA = {
+    1: [
+      ['It is a red ball.', '🔴⚽', 'Es una pelota roja.'],
+      ['I am happy.', '😀', 'Estoy contenta.'],
+      ['It is a big dog.', '🐕', 'Es un perro grande.'],
+      ['I am a girl.', '👧', 'Soy una niña.'],
+      ['It is a small cat.', '🐈', 'Es un gato pequeño.'],
+      ['I am seven.', '7️⃣', 'Tengo siete años.'],
+      ['It is a green frog.', '🐸', 'Es una rana verde.'],
+      ['I am hungry.', '😋', 'Tengo hambre.'],
+      ['It is a blue car.', '🚙', 'Es un coche azul.'],
+      ['I am tired.', '😴', 'Estoy cansada.'],
+      ['It is a yellow bus.', '🚌', 'Es un autobús amarillo.'],
+      ['I am cold.', '🥶', 'Tengo frío.'],
+      ['It is a funny clown.', '🤡', 'Es un payaso gracioso.'],
+      ['It is a pink pig.', '🐷', 'Es un cerdo rosa.']
+    ],
+    2: [
+      ['I like apples.', '🍎', 'Me gustan las manzanas.'],
+      ['I like pizza.', '🍕', 'Me gusta la pizza.'],
+      ['I don\'t like fish.', '🐟', 'No me gusta el pescado.'],
+      ['I like dogs.', '🐶', 'Me gustan los perros.'],
+      ['I don\'t like spiders.', '🕷️', 'No me gustan las arañas.'],
+      ['I like bananas.', '🍌', 'Me gustan los plátanos.'],
+      ['I don\'t like milk.', '🥛', 'No me gusta la leche.'],
+      ['I like ice cream.', '🍦', 'Me gusta el helado.'],
+      ['I don\'t like carrots.', '🥕', 'No me gustan las zanahorias.'],
+      ['I like cats.', '🐱', 'Me gustan los gatos.'],
+      ['I like chocolate.', '🍫', 'Me gusta el chocolate.'],
+      ['I don\'t like snakes.', '🐍', 'No me gustan las serpientes.'],
+      ['I like horses.', '🐴', 'Me gustan los caballos.'],
+      ['I don\'t like onions.', '🧅', 'No me gustan las cebollas.'],
+      ['I like strawberries.', '🍓', 'Me gustan las fresas.']
+    ],
+    3: [
+      ['I have got a dog.', '🐶', 'Tengo un perro.'],
+      ['She has got a blue bike.', '🚲', 'Ella tiene una bici azul.'],
+      ['He has got a red hat.', '🎩', 'Él tiene un sombrero rojo.'],
+      ['I have got a cat.', '🐱', 'Tengo un gato.'],
+      ['We have got a big house.', '🏠', 'Tenemos una casa grande.'],
+      ['They have got two balls.', '⚽⚽', 'Ellos tienen dos pelotas.'],
+      ['She has got a pink bag.', '👜', 'Ella tiene un bolso rosa.'],
+      ['I have got a new book.', '📘', 'Tengo un libro nuevo.'],
+      ['He has got a small boat.', '⛵', 'Él tiene un barco pequeño.'],
+      ['You have got a nice kite.', '🪁', 'Tienes una cometa bonita.'],
+      ['We have got a green car.', '🚗', 'Tenemos un coche verde.'],
+      ['She has got long hair.', '👩‍🦰', 'Ella tiene el pelo largo.'],
+      ['He has got a big dog.', '🐕', 'Él tiene un perro grande.'],
+      ['I have got two cats.', '🐱🐱', 'Tengo dos gatos.']
+    ],
+    4: [
+      ['The bird can fly.', '🐦', 'El pájaro puede volar.'],
+      ['I can\'t swim.', '🏊', 'No sé nadar.'],
+      ['I can run fast.', '🏃', 'Puedo correr rápido.'],
+      ['The fish can swim.', '🐟', 'El pez sabe nadar.'],
+      ['A dog can\'t fly.', '🐕🚫', 'Un perro no puede volar.'],
+      ['She can sing.', '🎤', 'Ella sabe cantar.'],
+      ['I can ride a bike.', '🚲', 'Sé montar en bici.'],
+      ['He can\'t jump high.', '🦘', 'Él no puede saltar alto.'],
+      ['We can play football.', '⚽', 'Podemos jugar al fútbol.'],
+      ['The cat can climb.', '🐈', 'El gato puede trepar.'],
+      ['I can read.', '📖', 'Sé leer.'],
+      ['They can dance.', '💃', 'Ellos pueden bailar.'],
+      ['The monkey can climb.', '🐒', 'El mono sabe trepar.'],
+      ['I can\'t hear you.', '👂', 'No te oigo.'],
+      ['He can cook.', '🧑‍🍳', 'Él sabe cocinar.']
+    ],
+    5: [
+      ['The cat is on the table.', '🐈', 'El gato está sobre la mesa.', 'and'],
+      ['The ball is under the bed.', '⚽', 'La pelota está debajo de la cama.', 'but'],
+      ['I am in the garden.', '🌳', 'Estoy en el jardín.', 'or'],
+      ['She is in the kitchen.', '🍳', 'Ella está en la cocina.', 'and'],
+      ['The book is on the chair.', '📕', 'El libro está sobre la silla.', 'of'],
+      ['The dog is under the tree.', '🐕', 'El perro está debajo del árbol.', 'but'],
+      ['He is in the car.', '🚗', 'Él está en el coche.', 'and'],
+      ['The bird is in the tree.', '🐦', 'El pájaro está en el árbol.', 'or'],
+      ['We are in the park.', '🏞️', 'Estamos en el parque.', 'and'],
+      ['The pen is on the desk.', '🖊️', 'El bolígrafo está sobre el escritorio.', 'but'],
+      ['The mouse is under the chair.', '🐭', 'El ratón está debajo de la silla.', 'of'],
+      ['My bag is on the floor.', '🎒', 'Mi mochila está en el suelo.', 'and'],
+      ['The fish is in the water.', '🐟', 'El pez está en el agua.', 'or'],
+      ['They are on the bus.', '🚌', 'Ellos están en el autobús.', 'but'],
+      ['The shoes are under the bed.', '👟', 'Los zapatos están debajo de la cama.', 'and']
+    ],
+    6: [
+      ['What is your name?', '📛', '¿Cómo te llamas?', 'and'],
+      ['How old are you?', '🎂', '¿Cuántos años tienes?', 'but'],
+      ['Do you like apples?', '🍎', '¿Te gustan las manzanas?', 'or'],
+      ['Where is the cat?', '🐈❓', '¿Dónde está el gato?', 'and'],
+      ['What is this?', '🤔', '¿Qué es esto?', 'of'],
+      ['Can you swim?', '🏊', '¿Sabes nadar?', 'and'],
+      ['Do you like pizza?', '🍕', '¿Te gusta la pizza?', 'but'],
+      ['What is your favourite colour?', '🎨', '¿Cuál es tu color favorito?', 'and'],
+      ['Where is my bag?', '🎒❓', '¿Dónde está mi mochila?', 'or'],
+      ['How are you?', '🙂', '¿Cómo estás?', 'and'],
+      ['Have you got a pet?', '🐕🐈', '¿Tienes una mascota?', 'but'],
+      ['What colour is it?', '🌈', '¿De qué color es?', 'and'],
+      ['Where do you live?', '🏠', '¿Dónde vives?', 'or'],
+      ['Do you like dogs?', '🐶', '¿Te gustan los perros?', 'and']
+    ],
+    7: [
+      ['She is reading.', '📖', 'Ella está leyendo.', 'and'],
+      ['They are playing football.', '⚽', 'Ellos están jugando al fútbol.', 'but'],
+      ['He is eating an apple.', '🍎', 'Él está comiendo una manzana.', 'and'],
+      ['I am drawing.', '🖍️', 'Estoy dibujando.', 'or'],
+      ['The boy is running.', '🏃', 'El niño está corriendo.', 'and'],
+      ['We are singing.', '🎤', 'Estamos cantando.', 'of'],
+      ['She is drinking milk.', '🥛', 'Ella está bebiendo leche.', 'but'],
+      ['The girl is dancing.', '💃', 'La niña está bailando.', 'and'],
+      ['They are swimming.', '🏊', 'Ellos están nadando.', 'or'],
+      ['He is sleeping.', '😴', 'Él está durmiendo.', 'and'],
+      ['The dog is barking.', '🐕', 'El perro está ladrando.', 'but'],
+      ['I am riding my bike.', '🚲', 'Estoy montando en mi bici.', 'and'],
+      ['Tom is painting a flower.', '🌼', 'Tom está pintando una flor.', 'or'],
+      ['We are watching a film.', '🎬', 'Estamos viendo una película.', 'and'],
+      ['Mia is playing the drums.', '🥁', 'Mia está tocando la batería.', 'but']
+    ]
+  };
+  /* ===== end DATA ===== */
+
+  const PRON = ['I', 'you', 'he', 'she', 'it', 'we', 'they'].concat(NAMES);
+  const AUX = ['is', 'are', 'am', 'can', 'can\'t', 'do', 'does', 'have', 'has'];
+  const DET = ['the', 'my', 'a'];
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- sentences ---------- */
+
+  // Tiles of a sentence: levels 1-3 keep capital and full stop; from level 4 lowercase, no punctuation.
+  function tokensOf(en, lv) {
+    const words = en.split(' ');
+    if (lv <= 3) return words;
+    return words.map((w) => {
+      const bare = w.replace(/[.,?!]+$/, '');
+      return (bare === 'I' || NAMES.indexOf(bare) >= 0) ? bare : bare.toLowerCase();
+    });
+  }
+  // The same words with the auxiliary moved ("she is reading" <-> "is she reading"): also valid English, but not the target.
+  function twinOf(t) {
+    if (t.length < 3) return null;
+    if (PRON.indexOf(t[0]) >= 0 && AUX.indexOf(t[1]) >= 0) return [t[1], t[0]].concat(t.slice(2));
+    if (DET.indexOf(t[0]) >= 0 && AUX.indexOf(t[2]) >= 0) return [t[2], t[0], t[1]].concat(t.slice(3));
+    if (AUX.indexOf(t[0]) >= 0 && PRON.indexOf(t[1]) >= 0) return [t[1], t[0]].concat(t.slice(2));
+    if (AUX.indexOf(t[0]) >= 0 && DET.indexOf(t[1]) >= 0) return [t[1], t[2], t[0]].concat(t.slice(3));
+    return null;
+  }
+
+  const SENTENCES = [];
+  const BY_ID = {};
+  Object.keys(DATA).forEach((lv) => DATA[lv].forEach((row) => {
+    const level = Number(lv);
+    const tokens = tokensOf(row[0], level);
+    const s = { id: row[0], level, en: row[0], pic: row[1], es: row[2], extra: row[3] || null, tokens,
+      twin: level >= 4 ? twinOf(tokens) : null };
+    SENTENCES.push(s);
+    BY_ID[s.id] = s;
+  }));
+  const ofLevel = (lv) => SENTENCES.filter((s) => s.level === lv);
+
+  // Shuffled tiles for a sentence: never already in order, extra tile mixed in from level 5.
+  function makeTiles(s) {
+    const base = s.tokens.map((t) => ({ text: t, extra: false }));
+    if (s.extra) base.push({ text: s.extra, extra: true });
+    const inOrder = (arr) => { const w = arr.filter((t) => !t.extra).map((t) => t.text); return w.every((t, i) => t === s.tokens[i]); };
+    let t = Kit.shuffle(base), tries = 0;
+    while (inOrder(t) && new Set(s.tokens).size > 1 && tries++ < 30) t = Kit.shuffle(base);
+    return t;
+  }
+
+  /* ---------- state ---------- */
+
+  const store = Kit.store(SLUG);
+  const load = () => store.get({ unlocked: 1, best: {} });
+  function isOpen(level, s) { return level === 1 || level <= s.unlocked || (s.best[level - 1] || 0) >= 2; }
+  const decks = {};
+  LEVELS.forEach((L) => { decks[L.n] = Kit.deck(SLUG, ofLevel(L.n).map((s) => s.id)); });
+
+  let level = 1, queue = [], pos = 0, score = 0, results = [];
+  let mode = 'idle'; // idle | answering | feedback
+  let tiles = [], placed = [], fails = 0, marks = null, spent = false, voiceOn = true, speakToken = 0;
+
+  const el = { start: $('start'), play: $('play'), train: $('train'), pool: $('pool'), input: $('input'), fb: $('fb'),
+    dots: $('dots'), go: $('go'), msg: $('msg') };
+  const app = document.querySelector('.k-app');
+  const cur = () => queue[pos].s;
+
+  /* ---------- start screen ---------- */
+
+  function showStart() {
+    speakToken++;
+    mode = 'idle';
+    app.classList.remove('is-playing');
+    el.play.hidden = true;
+    el.start.hidden = false;
+    $('novoice').hidden = Kit.canSpeak('en');
+    const s = load();
+    const box = $('levels');
+    box.textContent = '';
+    let anyLocked = false;
+    LEVELS.forEach((L) => {
+      const open = isOpen(L.n, s);
+      if (!open) anyLocked = true;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lvl';
+      b.disabled = !open;
+      b.dataset.level = L.n;
+      b.innerHTML = '<span class="lvl__n"></span><span class="lvl__t"><span class="lvl__name"></span><span class="lvl__sub"></span></span><span class="lvl__side"></span>';
+      b.querySelector('.lvl__n').textContent = L.n;
+      b.querySelector('.lvl__name').textContent = L.name;
+      b.querySelector('.lvl__sub').textContent = L.sub;
+      b.querySelector('.lvl__sub').lang = 'en';
+      const side = b.querySelector('.lvl__side');
+      if (open) side.appendChild(Kit.stars.el(s.best[L.n] || 0, 3));
+      else { side.textContent = '🔒'; side.setAttribute('role', 'img'); side.setAttribute('aria-label', 'Bloqueado'); }
+      b.addEventListener('click', () => { Kit.sfx('tap'); startRound(L.n); });
+      box.appendChild(b);
+    });
+    $('lock-note').hidden = !anyLocked;
+  }
+
+  /* ---------- round ---------- */
+
+  function startRound(lv) {
+    level = lv;
+    voiceOn = Kit.canSpeak('en');
+    queue = decks[lv].next(ROUND).map((id, i) => ({ s: BY_ID[id], orig: i, rep: false }));
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    el.start.hidden = true;
+    el.play.hidden = false;
+    app.classList.add('is-playing');
+    showItem();
+  }
+
+  function renderDots() {
+    el.dots.textContent = '';
+    const it = queue[pos];
+    results.forEach((r, i) => {
+      const d = document.createElement('i');
+      if (r === true) d.className = 'is-done';
+      else if (r === false) d.className = 'is-miss';
+      if (it && !it.rep && it.orig === i) d.classList.add('is-current');
+      el.dots.appendChild(d);
+    });
+  }
+
+  function speakSentence(rate) { return voiceOn ? Kit.speak(cur().en, 'en', { rate: rate || 0.85 }) : Promise.resolve(); }
+
+  function showItem() {
+    const s = cur();
+    speakToken++;
+    renderDots();
+    $('pic').textContent = s.pic;
+    $('es').textContent = s.es;
+    $('say').hidden = !voiceOn;
+    tiles = makeTiles(s);
+    placed = [];
+    fails = 0;
+    marks = null;
+    spent = false;
+    mode = 'answering';
+    el.input.hidden = false;
+    el.fb.hidden = true;
+    setMsg(voiceOn ? 'Escucha y sube las palabras al tren.' : 'Lee y sube las palabras al tren.');
+    render();
+    speakSentence();
+  }
+
+  function setMsg(text, ko) { el.msg.textContent = text; el.msg.classList.toggle('is-ko', !!ko); }
+
+  /* ---------- rendering ---------- */
+
+  function wagon(text, cls) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'wag' + (cls ? ' ' + cls : '');
+    b.textContent = text;
+    return b;
+  }
+
+  function render() {
+    const s = cur();
+    // train: locomotive + placed wagons
+    el.train.textContent = '';
+    const loco = document.createElement('span');
+    loco.className = 'loco';
+    loco.setAttribute('aria-hidden', 'true');
+    loco.textContent = '🚂';
+    el.train.appendChild(loco);
+    if (!placed.length) {
+      const h = document.createElement('span');
+      h.className = 'train__hint';
+      h.textContent = 'Toca las palabras para subirlas.';
+      el.train.appendChild(h);
+    }
+    placed.forEach((ti, k) => {
+      const b = wagon(tiles[ti].text, marks ? (marks[k] ? 'is-ok' : 'is-ko') : '');
+      b.dataset.k = k;
+      b.disabled = mode !== 'answering';
+      b.setAttribute('aria-label', tiles[ti].text + ': tócala para quitarla del tren');
+      b.addEventListener('click', () => { removeAt(k); });
+      el.train.appendChild(b);
+    });
+    // pool: wagons still waiting
+    el.pool.textContent = '';
+    tiles.forEach((t, i) => {
+      const used = placed.indexOf(i) >= 0;
+      const b = wagon(t.text, used ? 'is-gone' : '');
+      b.disabled = used || mode !== 'answering';
+      if (used) b.setAttribute('aria-hidden', 'true');
+      b.addEventListener('click', () => { addTile(i); });
+      el.pool.appendChild(b);
+    });
+    el.go.disabled = !(mode === 'answering' && placed.length === s.tokens.length && !spent);
+  }
+
+  /* ---------- input ---------- */
+
+  function clearMarks() { marks = null; spent = false; }
+
+  function addTile(i) {
+    if (mode !== 'answering' || placed.indexOf(i) >= 0 || placed.length >= cur().tokens.length) return;
+    Kit.sfx('tap');
+    clearMarks();
+    if (fails < 2) setMsg(fails ? 'Prueba otra vez con las palabras.' : (voiceOn ? 'Escucha y sube las palabras al tren.' : 'Lee y sube las palabras al tren.'));
+    placed.push(i);
+    render();
+  }
+  function removeAt(k) {
+    if (mode !== 'answering') return;
+    Kit.sfx('tap');
+    clearMarks();
+    placed.splice(k, 1);
+    render();
+  }
+
+  /* ---------- checking ---------- */
+
+  const seqOf = () => placed.map((i) => tiles[i].text);
+  const same = (a, b) => a.length === b.length && a.every((t, i) => t === b[i]);
+
+  // Tile indices that spell the target order (identical tiles are interchangeable).
+  function solution(s) {
+    const left = tiles.map((t, i) => (t.extra ? -1 : i));
+    return s.tokens.map((tok) => {
+      const k = left.findIndex((i) => i >= 0 && tiles[i].text === tok);
+      const i = left[k];
+      left[k] = -1;
+      return i;
+    });
+  }
+
+  function check() {
+    if (mode !== 'answering') return;
+    const it = queue[pos], s = it.s;
+    const seq = seqOf();
+    if (seq.length !== s.tokens.length || spent) return;
+    const first = fails === 0 && !it.rep;
+
+    if (same(seq, s.tokens)) {
+      mode = 'feedback';
+      Kit.sfx('ok');
+      marks = seq.map(() => true);
+      if (first) { score++; results[it.orig] = true; decks[level].mark(s.id, true); }
+      showFeedback(true, s, it);
+      speakSentence();
+      return;
+    }
+    if (s.twin && same(seq, s.twin)) {
+      // A real English sentence, but the other kind (question vs. statement): gentle nudge, not a miss.
+      Kit.sfx('tap');
+      spent = true;
+      setMsg('Esa frase también existe, pero mira el español: ¿es pregunta o no?');
+      render();
+      return;
+    }
+    // a miss
+    fails++;
+    Kit.sfx('ko');
+    if (first) { results[it.orig] = false; decks[level].mark(s.id, false); }
+    if (fails === 1) {
+      marks = seq.map((t, k) => t === s.tokens[k]);
+      spent = true;
+      setMsg('¡Casi! Los vagones rojos no van ahí.', true);
+      renderDots();
+      render();
+    } else {
+      // second failed check: show the sentence, say it, and bring it back once later
+      let again = false;
+      if (!it.rep) {
+        const at = Math.min(queue.length, pos + 1 + Kit.randInt(2, 4));
+        queue.splice(at, 0, { s, orig: it.orig, rep: true });
+        again = true;
+      }
+      placed = solution(s);
+      marks = placed.map(() => true);
+      mode = 'feedback';
+      renderDots();
+      showFeedback(false, s, it, again);
+      speakSentence();
+    }
+  }
+
+  function showFeedback(right, s, it, again) {
+    el.input.hidden = true;
+    el.fb.hidden = false;
+    setMsg('');
+    renderDots();
+    const t = $('fb-title');
+    t.className = 'fb__title ' + (right ? 'is-ok' : 'is-ko');
+    t.textContent = right ? '✓ ' + Kit.praise() : '✗ ' + Kit.encourage();
+    $('fb-en').textContent = s.en;
+    $('fb-es').textContent = s.es;
+    $('fb-note').textContent = right ? '' : (again ? 'Así va el tren. ¡La verás otra vez!' : 'Así va el tren.');
+    render();
+    $('next').focus({ preventScroll: true });
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    speakToken++;
+    pos++;
+    if (pos >= queue.length) finish();
+    else showItem();
+  }
+
+  /* ---------- result ---------- */
+
+  function finish() {
+    mode = 'idle';
+    const s = load();
+    const n = Kit.stars.calc(score, ROUND);
+    const best = Object.assign({}, s.best);
+    best[level] = Math.max(best[level] || 0, n);
+    const opens = n >= 2 && level < LEVELS.length;
+    const newly = opens && !isOpen(level + 1, s);
+    store.set({ best, unlocked: Math.max(s.unlocked, opens ? level + 1 : 1) });
+
+    const extra = document.createElement('div');
+    extra.style.width = '100%';
+    const row = document.createElement('div');
+    row.className = 'train-row';
+    row.setAttribute('aria-hidden', 'true');
+    row.textContent = '🚂' + '🚃'.repeat(score);
+    extra.appendChild(row);
+    if (newly) {
+      const u = document.createElement('p');
+      u.style.cssText = 'font-size:22px;font-weight:800;color:var(--ok);margin:0';
+      u.textContent = '🔓 ¡Nivel ' + (level + 1) + ' abierto!';
+      extra.appendChild(u);
+    }
+    const actions = [];
+    if (opens) actions.push({ label: 'Siguiente nivel', primary: true, onClick: () => startRound(level + 1) });
+    actions.push({ label: 'Elegir nivel', onClick: showStart });
+    Kit.result({ slug: SLUG, score, total: ROUND, extra, actions, onAgain: () => startRound(level) });
+  }
+
+  /* ---------- wiring ---------- */
+
+  $('go').addEventListener('click', check);
+  $('next').addEventListener('click', next);
+  $('say').addEventListener('click', () => { if (mode !== 'idle') speakSentence(); });
+  $('quit').addEventListener('click', () => { Kit.sfx('tap'); showStart(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (el.play.hidden || document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'Enter') {
+      const a = document.activeElement;
+      if (a && (a.id === 'quit' || a.classList.contains('wag') || a.id === 'say')) return;
+      e.preventDefault();
+      if (mode === 'answering') check(); else if (mode === 'feedback') next();
+    }
+  });
+
+  Kit.mount({ slug: SLUG, title: 'Sentence Train' });
+  Kit.ready.then(showStart);
+
+  // Hooks for the automated checks (not used by the game itself).
+  window.__train = { SENTENCES, LEVELS, ROUND, NAMES, ofLevel, makeTiles, tokensOf, twinOf, decks, isOpen,
+    get state() { return { level, pos, mode, fails, score, placed: placed.slice(), tiles: tiles.map((t) => t.text), queue: queue.map((q) => q.s.id + (q.rep ? '*' : '')) }; } };
+})();
+</script>
+</body>
+</html>

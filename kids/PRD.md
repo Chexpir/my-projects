@@ -4,7 +4,7 @@ Ten small educational games for a 7-year-old, built as static pages under `kids/
 Seven are in Spanish (maths, time, money, spelling, reading, logic). Three teach English, and one of those is about spelling.
 
 - Date: 2026-11-11
-- Status: Prompt 0 (kit and hub) and Prompts 1, 3, 4, 5, 7, 8 and 9 are built. Prompts 2, 6 and 10 are not built yet.
+- Status: Prompt 0 (kit and hub) and Prompts 1 to 10 are built. All ten games are marked `ready: true` in `kids/games.js`.
 - Builder: Claude Sonnet, one session per prompt
 
 ## 0. How to use this file
