@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Phonics: test</title>
+<style>body{font:16px/1.4 monospace;padding:16px} .ok{color:#1e8e4e} .ko{color:#d64545;font-weight:bold}</style></head>
+<body>
+<h1>Phonics: comprobación automática</h1>
+<p>Abre esta página con el servidor local. Juega cada minijuego dos veces: todo bien y con un fallo.</p>
+<pre id="out">Cargando…</pre>
+<iframe id="f" src="index.html" style="position:absolute;left:-9999px;width:400px;height:700px" title="juego"></iframe>
+<script>
+(function () {
+  'use strict';
+  const out = document.getElementById('out');
+  const lines = []; let failed = 0;
+  const log = (ok, msg) => { if (!ok) failed++; lines.push((ok ? 'ok   ' : 'FAIL ') + msg); };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const f = document.getElementById('f');
+
+  f.addEventListener('load', async () => {
+    const W = f.contentWindow, D = W.document, P = W.__phonics;
+    W.addEventListener('error', (e) => log(false, 'error: ' + e.message));
+    for (let i = 0; i < 40 && !D.querySelector('[data-lesson]'); i++) await wait(50);
+    const L = P.DATA[0];
+
+    // Data sanity: gap words appear in their sentence; words carry the pattern.
+    const re = new RegExp(L.pattern, 'i');
+    L.words.forEach((w) => log(re.test(w[0]) && w.length === 5, 'word ' + w[0]));
+    L.sentences.forEach((s) => s.gaps.forEach((g) =>
+      log(s.en.split(' ').some((t) => t.replace(/[.,!?]+$/, '') === g[0]), 'gap "' + g[0] + '" in "' + s.en + '"')));
+    log(P.words("don't be RUDE! use kind words please").join(' ') === P.words("Don't be rude! Use kind words, please!").join(' '), 'dictation is lenient');
+
+    function answer(key, right) {
+      const it = P.item;
+      if (key === 'words' || key === 'gaps') {
+        const btns = [...D.querySelectorAll('#input .k-choice')];
+        const b = btns.find((x) => right ? x.dataset.opt === it.word : x.dataset.opt !== it.word);
+        b.click();
+        return;
+      }
+      const target = it.s.en.split(' ');
+      if (key === 'order') {
+        const seq = right ? target : target.slice().reverse();
+        seq.forEach((t) => { const b = [...D.querySelectorAll('.pool .k-tile')].find((x) => !x.disabled && x.dataset.word === t); b.click(); });
+        D.getElementById('go').click();
+        return;
+      }
+      const ta = D.getElementById('write');
+      ta.value = right ? it.s.en.toLowerCase().replace(/[.,!]/g, '') : 'the cat';
+      ta.dispatchEvent(new W.Event('input'));
+      D.getElementById('go').click();
+    }
+
+    async function play(key, missFirst) {
+      [...D.querySelectorAll('[data-lesson]')][0] && !D.getElementById('lessons').hidden && D.querySelector('[data-lesson]').click();
+      D.querySelector('[data-game="' + key + '"]').click();
+      const total = P.state.total;
+      let first = true, guard = 0;
+      while (!D.querySelector('.k-overlay') && guard++ < 60) {
+        if (P.state.mode === 'answering') {
+          if (first && missFirst) {
+            answer(key, false);
+            if (P.state.mode === 'answering') { // second try in order / dict
+              if (key === 'order') { while (D.querySelector('.train .k-tile')) D.querySelector('.train .k-tile').click(); }
+              answer(key, false);
+            }
+          } else answer(key, true);
+          first = false;
+        }
+        if (P.state.mode !== 'feedback') { log(false, key + ': not in feedback after answer'); break; }
+        if (missFirst && guard === 1) log(P.state.queue.some((q) => q.endsWith('*')), key + ': missed item comes back once');
+        D.getElementById('next').click();
+      }
+      const ov = D.querySelector('.k-overlay');
+      const stars = ov ? ov.querySelectorAll('.k-stars--big .on').length : 0;
+      const expect = missFirst ? W.Kit.stars.calc(total - 1, total) : 3;
+      log(!!ov && stars === expect, key + (missFirst ? ' with one miss' : ' all right') + ': ' + total + ' items, ' + stars + ' stars (expected ' + expect + ')');
+      if (ov) [...ov.querySelectorAll('button')].find((b) => b.textContent === 'Elegir juego').click();
+    }
+
+    for (const g of P.GAMES) { await play(g.key, false); await play(g.key, true); }
+
+    const best = W.Kit.store('phonics').get({ best: {} }).best;
+    log(P.GAMES.every((g) => best[L.id + ':' + g.key] === 3), 'best stars saved per game');
+    out.innerHTML = lines.map((l) => '<span class="' + (l.startsWith('ok') ? 'ok' : 'ko') + '">' + l.replace(/</g, '&lt;') + '</span>').join('\n') +
+      '\n\n' + (failed ? failed + ' FAILED' : 'ALL PASSED');
+    document.title = failed ? 'FAILED' : 'PASSED';
+  });
+})();
+</script>
+</body></html>

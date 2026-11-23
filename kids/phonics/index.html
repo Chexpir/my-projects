@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Phonics: lecciones de sonidos en inglés con cuatro minijuegos.">
+<meta name="theme-color" content="#fff8ec">
+<title>Phonics</title>
+<link rel="stylesheet" href="../shared/kit.css">
+<style>
+  .menu { display: flex; flex-direction: column; gap: 8px; }
+  .menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 900; text-align: center; }
+  .menu p { margin: 0 0 4px; text-align: center; color: var(--muted); font-weight: 700; }
+  .lvl {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 6px 14px;
+    text-align: left; border: 3px solid var(--accent); border-radius: var(--radius);
+    background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--accent); cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .lvl:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent); }
+  .lvl__n { flex: none; min-width: 48px; height: 48px; padding: 0 6px; border-radius: 24px; background: var(--accent); color: var(--on-accent);
+            display: grid; place-items: center; font-size: 28px; font-weight: 900; line-height: 1; }
+  .lvl__t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .lvl__name { font-size: 22px; font-weight: 900; line-height: 1.15; }
+  .lvl__sub { font-size: 20px; font-weight: 600; color: var(--muted); line-height: 1.2; }
+  .lvl__side { flex: none; font-size: 20px; }
+  .lvl__side .k-stars { font-size: 22px; gap: 2px; }
+  .novoice { margin: 0; padding: 8px 12px; border-radius: 14px; background: #fff3cd; border: 2px solid #f2c200; font-size: 20px; font-weight: 700; text-align: center; }
+  .lesson-head { display: flex; align-items: center; gap: 10px; }
+  .lesson-head .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; flex: none; }
+  .lesson-head h2 { flex: 1; margin: 0; font-size: 24px; text-align: left; line-height: 1.1; }
+  .sound { margin: 0; text-align: center; font-size: 22px; font-weight: 800; }
+
+  .k-app.is-playing { height: 100vh; height: 100dvh; }
+  .play { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .play > * { flex: none; }
+  .play-top { display: flex; align-items: center; gap: 10px; }
+  .play-top .k-btn { min-height: 56px; padding: 0 16px; font-size: 20px; white-space: nowrap; flex: none; }
+  .play-top .k-progress { flex: 1; gap: 4px; flex-wrap: nowrap; }
+  .play-top .k-progress > i { width: 13px; height: 13px; border-width: 3px; flex: none; }
+
+  .prompt { display: flex; align-items: center; gap: 10px; padding: 6px 10px; min-height: 68px; }
+  .pic { flex: none; min-width: 48px; text-align: center; font-size: 38px; line-height: 1; }
+  .ins { flex: 1; min-width: 0; font-size: 21px; font-weight: 800; line-height: 1.15; }
+  .listen { flex: none; display: flex; gap: 6px; }
+  .say { min-width: 56px; min-height: 56px; border-radius: 50%; border: 2px solid var(--line); background: var(--card);
+         font-size: 26px; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .say:active { transform: translateY(2px); }
+
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+  .sent { font-size: clamp(23px, 6.2vw, 32px); font-weight: 900; line-height: 1.3; }
+  .es { font-size: 20px; font-weight: 700; color: var(--muted); line-height: 1.2; }
+  .gap { display: inline-block; min-width: 3.2em; padding: 0 2px; border-bottom: 4px dashed var(--accent); color: var(--accent); }
+  .gap.is-ok { border-bottom: 4px solid var(--ok); color: var(--ok); }
+  .gap.is-ko { border-bottom: 4px solid var(--ko); color: var(--ko); }
+  .big-q { font-size: 64px; line-height: 1; }
+  .mg { color: var(--accent); text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 4px; }
+
+  .choices { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .choices .k-choice { min-width: 130px; }
+
+  .train {
+    display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 8px;
+    padding: 6px 10px; min-height: 72px; width: 100%; border-radius: 16px; background: #f1ead9; border: 2px solid var(--line);
+  }
+  .train__hint { flex: 1; color: var(--muted); font-size: 20px; font-weight: 700; }
+  .pool { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 8px; }
+  .k-tile { font-size: clamp(22px, 6vw, 28px); }
+  .k-tile.is-gone { display: none; }
+  .pool:empty, .pool:not(:has(.k-tile:not(.is-gone))) { display: none; }
+  .train .k-tile { border-color: var(--ink); }
+  .train .k-tile.is-ok { border-color: var(--ok); }
+  .train .k-tile.is-ko { border-color: var(--ko); border-style: dashed; }
+  .train .k-tile.is-ok::after { content: " \2713"; color: var(--ok); font-size: 16px; }
+  .train .k-tile.is-ko::after { content: " \2717"; color: var(--ko); font-size: 16px; }
+
+  .write {
+    width: 100%; min-height: 96px; padding: 10px 12px; border: 3px solid var(--line); border-radius: 16px;
+    font: inherit; font-size: 26px; font-weight: 800; color: var(--ink); background: #fff; resize: none;
+  }
+  .write:focus { outline: none; border-color: var(--accent); }
+  .marks { font-size: 24px; font-weight: 800; line-height: 1.5; }
+  .marks .w-ok { color: var(--ok); }
+  .marks .w-ok::after { content: "\2713"; font-size: 14px; vertical-align: super; }
+  .marks .w-ko { color: var(--ko); text-decoration: line-through wavy; }
+  .marks .w-ko::after { content: "\2717"; font-size: 14px; vertical-align: super; text-decoration: none; display: inline-block; }
+  .marks .w-miss { color: var(--ko); border-bottom: 3px dashed var(--ko); }
+  .peek { margin-top: 2px; }
+
+  .msg { min-height: 28px; text-align: center; font-size: 21px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+  .msg.is-ko { color: var(--ko); }
+  .msg:empty { display: none; }
+  .dock { margin-top: auto; }
+  #go { width: 100%; font-size: 26px; }
+  .fb { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+  .fb__title { font-size: 26px; font-weight: 900; }
+  .fb__title.is-ok { color: var(--ok); }
+  .fb__title.is-ko { color: var(--ko); }
+  .fb__en { font-size: clamp(23px, 6.5vw, 30px); font-weight: 900; line-height: 1.2; }
+  .fb__es { font-size: 20px; font-weight: 700; color: var(--muted); line-height: 1.2; }
+  .fb__note { font-size: 20px; font-weight: 700; color: var(--muted); }
+  #next { width: 100%; margin-top: 4px; min-height: 60px; }
+  @media (max-width: 480px) {
+    .play { gap: 6px; padding-bottom: 8px; }
+    .stage { gap: 4px; }
+    .es { line-height: 1.1; }
+    .prompt .pic { display: none; }
+    .ins { font-size: 20px; }
+    .train { gap: 6px; padding: 5px 6px; }
+    .train .k-tile, .pool .k-tile { padding: 2px 8px; font-size: 22px; }
+    .pool { gap: 6px; }
+  }
+</style>
+</head>
+<body>
+<div class="k-app">
+  <header id="k-header"></header>
+
+  <main class="k-screen" id="lessons" aria-label="Elegir lección">
+    <div class="menu">
+      <h2>¡Elige tu lección!</h2>
+      <p>Cada lección tiene cuatro juegos.</p>
+      <div id="lesson-list" class="menu"></div>
+      <p class="novoice" id="novoice" hidden>Aviso para adultos: este dispositivo no tiene voz en inglés. Los juegos enseñarán el texto en lugar de leerlo.</p>
+    </div>
+  </main>
+
+  <main class="k-screen" id="games" hidden aria-label="Elegir juego">
+    <div class="menu">
+      <div class="lesson-head">
+        <button type="button" class="k-btn k-btn--ghost" id="back-lessons" aria-label="Volver a las lecciones">‹ Lecciones</button>
+        <h2 id="lesson-title"></h2>
+      </div>
+      <p class="sound" id="lesson-sound"></p>
+      <div id="game-list" class="menu"></div>
+    </div>
+  </main>
+
+  <main class="k-screen play" id="play" hidden aria-label="Partida">
+    <div class="play-top">
+      <button type="button" class="k-btn k-btn--ghost" id="quit" aria-label="Volver a la lección">‹ Lección</button>
+      <div class="k-progress" id="dots" aria-hidden="true"></div>
+    </div>
+    <div class="k-card prompt">
+      <div class="pic" id="pic" aria-hidden="true"></div>
+      <div class="ins" id="ins"></div>
+      <div class="listen">
+        <button type="button" class="say" id="say" aria-label="Escuchar">🔊</button>
+        <button type="button" class="say" id="slow" aria-label="Escuchar despacio">🐢</button>
+      </div>
+    </div>
+    <div class="stage" id="stage"></div>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+    <div class="dock">
+      <div id="input"></div>
+      <div class="fb" id="fb" hidden role="status" aria-live="polite">
+        <div class="fb__title" id="fb-title"></div>
+        <div class="fb__en" id="fb-en" lang="en"></div>
+        <div class="fb__es" id="fb-es"></div>
+        <div class="fb__note" id="fb-note"></div>
+        <button type="button" class="k-btn k-btn--big" id="next">Siguiente</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../shared/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== DATA: lessons (edit here) =====
+     Add a new lesson at the END of the list. Each lesson has:
+     - id: unique, never change it once used (progress is saved under it).
+     - date, title, sound: what the lesson screen shows.
+     - pattern: a regular expression for the phonics pattern. Its letters are underlined
+       in the feedback (u[^aeiou]e = "u", one consonant, "e": cube, tune, June).
+     - words: [word, picture, Spanish, distractor, distractor]. "Escucha y elige".
+     - sentences: { en, es, pic, gaps }. Used by "Rellena el hueco", "Ordena la frase" and "Dictado".
+       gaps: [word in the sentence, distractor, distractor]. Spell the word exactly as in the sentence.
+     British English. */
+  const SLUG = 'phonics';
+  const DATA = [
+    {
+      id: '2026-11-12',
+      date: '12 de noviembre',
+      title: 'La «e» mágica: u-e',
+      sound: 'u_e: flute, tune, cube',
+      pattern: 'u[^aeiou]e',
+      words: [
+        ['flute',   '🪈', 'flauta',      'flat',   'float'],
+        ['tune',    '🎵', 'melodía',     'tin',    'tone'],
+        ['huge',    '🐘', 'enorme',      'hug',    'hut'],
+        ['cube',    '🧊', 'cubo',        'cub',    'cab'],
+        ['use',     '🛠️', 'usar',        'us',     'bus'],
+        ['rude',    '😠', 'maleducado',  'rod',    'red'],
+        ['June',    '📅', 'junio',       'Jan',    'Jane'],
+        ['cute',    '🐰', 'mono, bonito', 'cut',   'cat'],
+        ['costume', '🦸', 'disfraz',     'custom', 'cost']
+      ],
+      sentences: [
+        { en: 'The girl plays the flute and loves this tune.', es: 'La niña toca la flauta y le encanta esta melodía.', pic: '👧🪈🎵',
+          gaps: [['flute', 'flat', 'float'], ['tune', 'tin', 'tone']] },
+        { en: 'He has a huge cube with presents inside.', es: 'Él tiene un cubo enorme con regalos dentro.', pic: '🧊🎁',
+          gaps: [['huge', 'hug', 'hut'], ['cube', 'cub', 'cab']] },
+        { en: 'We use this tune to relax at home.', es: 'Usamos esta melodía para relajarnos en casa.', pic: '🎵🏠',
+          gaps: [['use', 'us', 'bus'], ['tune', 'tin', 'tone']] },
+        { en: 'Don\'t be rude! Use kind words, please!', es: '¡No seas maleducado! ¡Usa palabras amables, por favor!', pic: '🙏💬',
+          gaps: [['rude', 'rod', 'red'], ['Use', 'Us', 'Bus']] },
+        { en: 'In June, she wears a cute costume for the school party.', es: 'En junio, ella lleva un disfraz muy mono para la fiesta del cole.', pic: '🦸🎉',
+          gaps: [['June', 'Jan', 'Jane'], ['cute', 'cut', 'cat'], ['costume', 'custom', 'cost']] }
+      ]
+    }
+  ];
+  /* ===== end DATA ===== */
+
+  const GAMES = [
+    { key: 'words', emoji: '👂', name: 'Escucha y elige', sub: 'Las palabras del sonido' },
+    { key: 'gaps',  emoji: '🧩', name: 'Rellena el hueco', sub: 'Elige la palabra que falta' },
+    { key: 'order', emoji: '🔀', name: 'Ordena la frase', sub: 'Pon las palabras en orden' },
+    { key: 'dict',  emoji: '✍️', name: 'Dictado', sub: 'Escucha y escribe la frase' }
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const store = Kit.store(SLUG);
+  const load = () => store.get({ best: {} });
+
+  let lesson = null, game = null, voiceOn = true;
+  let queue = [], pos = 0, score = 0, results = [], mode = 'idle', fails = 0;
+  let speakToken = 0;
+  let view = null; // per-item state of the current mini game
+
+  const app = document.querySelector('.k-app');
+  const scr = { lessons: $('lessons'), games: $('games'), play: $('play') };
+  function show(name) {
+    speakToken++;
+    Object.keys(scr).forEach((k) => { scr[k].hidden = k !== name; });
+    app.classList.toggle('is-playing', name === 'play');
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- text helpers ---------- */
+
+  const tokens = (en) => en.split(' ');
+  // Lenient comparison for the dictation: no case, no punctuation, no apostrophes.
+  const norm = (w) => w.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]/g, '');
+  const words = (txt) => txt.split(/\s+/).map(norm).filter(Boolean);
+
+  // A word with the phonics pattern underlined: "c<u>u</u>b<u>e</u>".
+  function phonicsEl(text, pattern) {
+    const frag = document.createDocumentFragment();
+    const re = new RegExp(pattern, 'gi');
+    let last = 0, m;
+    while ((m = re.exec(text))) {
+      frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const s = m[0];
+      const a = document.createElement('span'); a.className = 'mg'; a.textContent = s[0];
+      frag.appendChild(a);
+      frag.appendChild(document.createTextNode(s.slice(1, -1)));
+      const b = document.createElement('span'); b.className = 'mg'; b.textContent = s[s.length - 1];
+      frag.appendChild(b);
+      last = m.index + s.length;
+    }
+    frag.appendChild(document.createTextNode(text.slice(last)));
+    return frag;
+  }
+
+  // Longest common subsequence: which typed words match the target (index pairs).
+  function align(typed, target) {
+    const n = typed.length, m = target.length;
+    const L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) {
+      L[i][j] = typed[i] === target[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    }
+    const okT = new Array(n).fill(false), okG = new Array(m).fill(false);
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      if (typed[i] === target[j]) { okT[i] = okG[j] = true; i++; j++; }
+      else if (L[i + 1][j] >= L[i][j + 1]) i++;
+      else j++;
+    }
+    return { okT, okG };
+  }
+
+  /* ---------- items per mini game ---------- */
+
+  function itemsFor(L, key) {
+    if (key === 'words') return Kit.shuffle(L.words.map((w) => ({ word: w[0], pic: w[1], es: w[2], options: [w[0], w[3], w[4]] })));
+    if (key === 'gaps') {
+      const out = [];
+      L.sentences.forEach((s) => s.gaps.forEach((g) => out.push({ s, word: g[0], options: g.slice() })));
+      return Kit.shuffle(out);
+    }
+    return Kit.shuffle(L.sentences.map((s) => ({ s })));
+  }
+
+  /* ---------- lesson and game menus ---------- */
+
+  function menuButton(n, name, sub, side, onClick) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'lvl';
+    b.innerHTML = '<span class="lvl__n"></span><span class="lvl__t"><span class="lvl__name"></span><span class="lvl__sub"></span></span><span class="lvl__side"></span>';
+    b.querySelector('.lvl__n').textContent = n;
+    b.querySelector('.lvl__name').textContent = name;
+    b.querySelector('.lvl__sub').textContent = sub;
+    b.querySelector('.lvl__side').appendChild(side);
+    b.addEventListener('click', () => { Kit.sfx('tap'); onClick(); });
+    return b;
+  }
+
+  function lessonStars(L, best) {
+    // A lesson's stars: the lowest of its four games (0 until all four are played).
+    return Math.min.apply(null, GAMES.map((g) => best[L.id + ':' + g.key] || 0));
+  }
+
+  function showLessons() {
+    show('lessons');
+    mode = 'idle';
+    $('novoice').hidden = Kit.canSpeak('en');
+    const best = load().best;
+    const box = $('lesson-list');
+    box.textContent = '';
+    DATA.forEach((L, i) => {
+      const b = menuButton(String(i + 1), L.date, L.title, Kit.stars.el(lessonStars(L, best), 3), () => showGames(L));
+      b.dataset.lesson = L.id;
+      box.appendChild(b);
+    });
+  }
+
+  function showGames(L) {
+    lesson = L;
+    show('games');
+    mode = 'idle';
+    $('lesson-title').textContent = L.date;
+    $('lesson-sound').textContent = L.title + ' · ' + L.sound;
+    const best = load().best;
+    const box = $('game-list');
+    box.textContent = '';
+    GAMES.forEach((g) => {
+      const b = menuButton(g.emoji, g.name, g.sub, Kit.stars.el(best[L.id + ':' + g.key] || 0, 3), () => startRound(g.key));
+      b.dataset.game = g.key;
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- round engine (shared by the four games) ---------- */
+
+  function startRound(key) {
+    game = GAMES.filter((g) => g.key === key)[0];
+    voiceOn = Kit.canSpeak('en');
+    queue = itemsFor(lesson, key).map((it, i) => ({ it, orig: i, rep: false }));
+    pos = 0; score = 0; results = new Array(queue.length).fill(null);
+    show('play');
+    showItem();
+  }
+
+  function renderDots() {
+    const d = $('dots');
+    d.textContent = '';
+    const q = queue[pos];
+    results.forEach((r, i) => {
+      const e = document.createElement('i');
+      if (r === true) e.className = 'is-done';
+      else if (r === false) e.className = 'is-miss';
+      if (q && !q.rep && q.orig === i) e.classList.add('is-current');
+      d.appendChild(e);
+    });
+  }
+
+  function setMsg(text, ko) { $('msg').textContent = text; $('msg').classList.toggle('is-ko', !!ko); }
+
+  function say(text, slow) {
+    if (!voiceOn || !text) return Promise.resolve();
+    return Kit.speak(text, 'en', { rate: slow ? 0.55 : 0.85 });
+  }
+  // What the 🔊 buttons read for the current item.
+  function sayCurrent(slow) {
+    const it = queue[pos] && queue[pos].it;
+    if (!it || mode === 'idle') return;
+    say(game.key === 'words' ? it.word : it.s.en, slow);
+  }
+
+  function showItem() {
+    speakToken++;
+    fails = 0;
+    mode = 'answering';
+    renderDots();
+    $('input').hidden = false;
+    $('fb').hidden = true;
+    $('stage').textContent = '';
+    $('input').textContent = '';
+    setMsg('');
+    view = null;
+    $('say').hidden = !voiceOn;
+    $('slow').hidden = !voiceOn || game.key === 'gaps';
+    RENDER[game.key](queue[pos].it);
+  }
+
+  // First attempt of an item decides the score; a miss brings it back once later.
+  function recordFirst(ok) {
+    const q = queue[pos];
+    if (fails > 0 || q.rep) return;
+    results[q.orig] = ok;
+    if (ok) score++;
+  }
+  function requeue() {
+    const q = queue[pos];
+    if (q.rep) return false;
+    const at = Math.min(queue.length, pos + 1 + Kit.randInt(2, 3));
+    queue.splice(at, 0, { it: q.it, orig: q.orig, rep: true });
+    return true;
+  }
+
+  function feedback(ok, en, es, again, enEl) {
+    mode = 'feedback';
+    renderDots();
+    $('input').hidden = true;
+    $('fb').hidden = false;
+    setMsg('');
+    const t = $('fb-title');
+    t.className = 'fb__title ' + (ok ? 'is-ok' : 'is-ko');
+    t.textContent = ok ? '✓ ' + Kit.praise() : '✗ ' + Kit.encourage();
+    const e = $('fb-en');
+    e.textContent = '';
+    if (enEl) e.appendChild(enEl); else e.textContent = en;
+    $('fb-es').textContent = es || '';
+    $('fb-note').textContent = ok ? '' : (again ? 'Así se dice. ¡Te saldrá otra vez!' : 'Así se dice.');
+    $('next').focus({ preventScroll: true });
+  }
+
+  function next() {
+    if (mode !== 'feedback') return;
+    Kit.sfx('tap');
+    speakToken++;
+    pos++;
+    if (pos >= queue.length) finish(); else showItem();
+  }
+
+  function finish() {
+    mode = 'idle';
+    const total = results.length;
+    const n = Kit.stars.calc(score, total);
+    const key = lesson.id + ':' + game.key;
+    const best = Object.assign({}, load().best);
+    best[key] = Math.max(best[key] || 0, n);
+    store.set({ best });
+    const idx = GAMES.indexOf(game);
+    const actions = [];
+    if (idx < GAMES.length - 1) {
+      const nx = GAMES[idx + 1];
+      actions.push({ label: 'Siguiente: ' + nx.name, primary: true, onClick: () => startRound(nx.key) });
+    }
+    actions.push({ label: 'Elegir juego', onClick: () => showGames(lesson) });
+    const extra = document.createElement('div');
+    extra.style.cssText = 'font-size:48px;line-height:1';
+    extra.setAttribute('aria-hidden', 'true');
+    extra.textContent = game.emoji;
+    Kit.result({ slug: SLUG, score, total, extra, actions, onAgain: () => startRound(game.key) });
+  }
+
+  /* ---------- the four mini games ---------- */
+
+  function choiceButtons(options, onPick) {
+    const box = document.createElement('div');
+    box.className = 'choices';
+    box.setAttribute('role', 'group');
+    box.setAttribute('aria-label', 'Respuestas');
+    Kit.shuffle(options).forEach((o) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'k-choice';
+      b.lang = 'en';
+      b.textContent = o;
+      b.dataset.opt = o;
+      b.addEventListener('click', () => onPick(o, b, box));
+      box.appendChild(b);
+    });
+    return box;
+  }
+
+  function markChoices(box, right, picked) {
+    box.querySelectorAll('button').forEach((b) => {
+      b.disabled = true;
+      if (b.dataset.opt === right) b.classList.add('is-ok');
+      else if (b === picked) b.classList.add('is-ko');
+    });
+  }
+
+  const RENDER = {
+    // 1. Hear a word and pick it among look-alikes (cube / cub / cab).
+    words(it) {
+      $('pic').textContent = voiceOn ? '👂' : it.pic;
+      $('ins').textContent = voiceOn ? 'Escucha y toca la palabra.' : 'Toca la palabra en inglés: ' + it.es + '.';
+      const q = document.createElement('div');
+      q.className = 'big-q';
+      q.setAttribute('aria-hidden', 'true');
+      q.textContent = voiceOn ? '❓' : it.pic;
+      $('stage').appendChild(q);
+      $('input').appendChild(choiceButtons(it.options, (o, b, box) => {
+        if (mode !== 'answering') return;
+        const ok = o === it.word;
+        recordFirst(ok);
+        markChoices(box, it.word, b);
+        Kit.sfx(ok ? 'ok' : 'ko');
+        const again = ok ? false : requeue();
+        q.textContent = it.pic;
+        const w = document.createElement('span');
+        w.appendChild(phonicsEl(it.word, lesson.pattern));
+        feedback(ok, it.word, it.pic + ' ' + it.es, again, w);
+        say(it.word);
+      }));
+      say(it.word);
+    },
+
+    // 2. A sentence with one word missing: pick the right spelling.
+    gaps(it) {
+      $('pic').textContent = it.s.pic;
+      $('ins').textContent = voiceOn ? 'Escucha la frase y elige la palabra que falta.' : 'Lee la frase y elige la palabra que falta.';
+      const sent = document.createElement('div');
+      sent.className = 'sent';
+      sent.lang = 'en';
+      const parts = tokens(it.s.en);
+      const at = parts.findIndex((t) => t.replace(/[.,!?]+$/, '') === it.word);
+      let gap = null;
+      parts.forEach((t, i) => {
+        if (i) sent.appendChild(document.createTextNode(' '));
+        if (i === at) {
+          gap = document.createElement('span');
+          gap.className = 'gap';
+          gap.textContent = ' ';
+          sent.appendChild(gap);
+          sent.appendChild(document.createTextNode(t.slice(it.word.length)));
+        } else sent.appendChild(document.createTextNode(t));
+      });
+      const es = document.createElement('div');
+      es.className = 'es';
+      es.textContent = it.s.es;
+      $('stage').appendChild(sent);
+      $('stage').appendChild(es);
+      $('input').appendChild(choiceButtons(it.options, (o, b, box) => {
+        if (mode !== 'answering') return;
+        const ok = o === it.word;
+        recordFirst(ok);
+        markChoices(box, it.word, b);
+        Kit.sfx(ok ? 'ok' : 'ko');
+        const again = ok ? false : requeue();
+        gap.textContent = it.word;
+        gap.classList.add(ok ? 'is-ok' : 'is-ko');
+        es.hidden = true;
+        const w = document.createElement('span');
+        w.appendChild(phonicsEl(it.word, lesson.pattern));
+        feedback(ok, it.word, '', again, w);
+        say(it.s.en);
+      }));
+    },
+
+    // 3. Put the word tiles in order (tap to add, tap again to take it back).
+    order(it) {
+      const target = tokens(it.s.en);
+      $('pic').textContent = it.s.pic;
+      $('ins').textContent = voiceOn ? 'Escucha y ordena la frase.' : 'Ordena la frase.';
+      const es = document.createElement('div');
+      es.className = 'es';
+      es.textContent = it.s.es;
+      const train = document.createElement('div');
+      train.className = 'train';
+      train.setAttribute('role', 'group');
+      train.setAttribute('aria-label', 'Tu frase');
+      train.lang = 'en';
+      $('stage').appendChild(es);
+      $('stage').appendChild(train);
+      const pool = document.createElement('div');
+      pool.className = 'pool';
+      pool.lang = 'en';
+      pool.setAttribute('role', 'group');
+      pool.setAttribute('aria-label', 'Palabras');
+      const go = document.createElement('button');
+      go.type = 'button';
+      go.id = 'go';
+      go.className = 'k-btn k-btn--big';
+      go.textContent = 'Comprobar';
+      $('input').appendChild(pool);
+      $('input').appendChild(go);
+
+      let tiles = Kit.shuffle(target), tries = 0;
+      while (tiles.join(' ') === target.join(' ') && tries++ < 30) tiles = Kit.shuffle(target);
+      view = { tiles, placed: [], marks: null };
+
+      function draw() {
+        train.textContent = '';
+        if (!view.placed.length) {
+          const h = document.createElement('span');
+          h.className = 'train__hint';
+          h.textContent = 'Toca las palabras para ponerlas aquí.';
+          train.appendChild(h);
+        }
+        view.placed.forEach((ti, k) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'k-tile' + (view.marks ? (view.marks[k] ? ' is-ok' : ' is-ko') : '');
+          b.textContent = view.tiles[ti];
+          b.disabled = mode !== 'answering';
+          b.addEventListener('click', () => {
+            if (mode !== 'answering') return;
+            Kit.sfx('tap'); view.marks = null; view.placed.splice(k, 1); draw();
+          });
+          train.appendChild(b);
+        });
+        pool.textContent = '';
+        view.tiles.forEach((t, i) => {
+          const used = view.placed.indexOf(i) >= 0;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'k-tile' + (used ? ' is-gone' : '');
+          b.textContent = t;
+          b.dataset.word = t;
+          b.disabled = used || mode !== 'answering';
+          if (used) b.setAttribute('aria-hidden', 'true');
+          b.addEventListener('click', () => {
+            if (mode !== 'answering' || view.placed.indexOf(i) >= 0) return;
+            Kit.sfx('tap'); view.marks = null; view.placed.push(i); draw();
+          });
+          pool.appendChild(b);
+        });
+        go.disabled = !(mode === 'answering' && view.placed.length === target.length && !view.marks);
+      }
+      view.check = () => {
+        if (mode !== 'answering' || view.placed.length !== target.length || view.marks) return;
+        const seq = view.placed.map((i) => view.tiles[i]);
+        const ok = seq.join(' ') === target.join(' ');
+        recordFirst(ok);
+        if (ok) {
+          Kit.sfx('ok');
+          view.marks = seq.map(() => true);
+          mode = 'feedback';
+          draw();
+          feedback(true, it.s.en, it.s.es);
+          say(it.s.en);
+          return;
+        }
+        fails++;
+        Kit.sfx('ko');
+        if (fails === 1) {
+          view.marks = seq.map((t, k) => t === target[k]);
+          setMsg('¡Casi! Toca las rojas para quitarlas.', true);
+          renderDots();
+          draw();
+          return;
+        }
+        // Second miss: show the sentence in order.
+        const left = view.tiles.map((t, i) => i);
+        view.placed = target.map((t) => { const k = left.findIndex((i) => i >= 0 && view.tiles[i] === t); const i = left[k]; left[k] = -1; return i; });
+        view.marks = target.map(() => true);
+        mode = 'feedback';
+        draw();
+        feedback(false, it.s.en, it.s.es, requeue());
+        say(it.s.en);
+      };
+      go.addEventListener('click', view.check);
+      draw();
+      say(it.s.en);
+    },
+
+    // 4. Dictation: hear the sentence and type it. Case and punctuation do not count.
+    dict(it) {
+      const target = tokens(it.s.en);
+      const goal = target.map(norm);
+      $('pic').textContent = '✍️';
+      $('ins').textContent = voiceOn ? 'Escucha y escribe la frase.' : 'Lee la frase, tápala y escríbela.';
+      const es = document.createElement('div');
+      es.className = 'es';
+      es.textContent = it.s.pic + ' ' + it.s.es;
+      $('stage').appendChild(es);
+      if (!voiceOn) {
+        // No English voice: show the sentence, she hides it before writing (copy from memory).
+        const sent = document.createElement('div');
+        sent.className = 'sent';
+        sent.lang = 'en';
+        sent.textContent = it.s.en;
+        const peek = document.createElement('button');
+        peek.type = 'button';
+        peek.className = 'k-btn k-btn--ghost peek';
+        peek.textContent = 'Tapar la frase';
+        peek.addEventListener('click', () => {
+          Kit.sfx('tap');
+          sent.hidden = !sent.hidden;
+          peek.textContent = sent.hidden ? 'Ver la frase' : 'Tapar la frase';
+          if (sent.hidden) ta.focus();
+        });
+        $('stage').appendChild(sent);
+        $('stage').appendChild(peek);
+      }
+      const marks = document.createElement('div');
+      marks.className = 'marks';
+      marks.lang = 'en';
+      marks.hidden = true;
+      const ta = document.createElement('textarea');
+      ta.className = 'write';
+      ta.id = 'write';
+      ta.lang = 'en';
+      ta.rows = 2;
+      ta.setAttribute('aria-label', 'Escribe la frase en inglés');
+      ta.setAttribute('autocomplete', 'off');
+      ta.setAttribute('autocorrect', 'off');
+      ta.setAttribute('autocapitalize', 'sentences');
+      ta.spellcheck = false;
+      ta.placeholder = 'Escribe aquí…';
+      $('stage').appendChild(ta);
+      $('stage').appendChild(marks);
+      const go = document.createElement('button');
+      go.type = 'button';
+      go.id = 'go';
+      go.className = 'k-btn k-btn--big';
+      go.textContent = 'Comprobar';
+      go.disabled = true;
+      $('input').appendChild(go);
+
+      const grow = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 6 + 'px'; };
+      ta.addEventListener('input', () => { go.disabled = !words(ta.value).length; grow(); });
+      ta.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); view.check(); } });
+
+      // Her words, each one green (right) or red (not in the sentence), plus dashes for missing words.
+      function showMarks(raw, okT, okG) {
+        marks.textContent = '';
+        const shown = raw.split(/\s+/).filter((w) => norm(w));
+        shown.forEach((w, i) => {
+          const s = document.createElement('span');
+          s.className = okT[i] ? 'w-ok' : 'w-ko';
+          s.textContent = w;
+          marks.appendChild(s);
+          marks.appendChild(document.createTextNode(' '));
+        });
+        const missing = Math.max(0, okG.filter((x) => !x).length - okT.filter((x) => !x).length);
+        for (let k = 0; k < missing; k++) {
+          const s = document.createElement('span');
+          s.className = 'w-miss';
+          s.textContent = '    ';
+          s.setAttribute('aria-label', 'falta una palabra');
+          marks.appendChild(s);
+          marks.appendChild(document.createTextNode(' '));
+        }
+        marks.hidden = false;
+      }
+
+      view = {};
+      view.check = () => {
+        if (mode !== 'answering') return;
+        const typed = words(ta.value);
+        if (!typed.length) return;
+        const ok = typed.join(' ') === goal.join(' ');
+        recordFirst(ok);
+        if (ok) {
+          Kit.sfx('ok');
+          ta.disabled = true;
+          marks.hidden = true;
+          feedback(true, it.s.en, it.s.es);
+          say(it.s.en);
+          return;
+        }
+        fails++;
+        Kit.sfx('ko');
+        grow();
+        const al = align(typed, goal);
+        showMarks(ta.value, al.okT, al.okG);
+        if (fails === 1) {
+          setMsg('¡Casi! Arregla las palabras rojas y vuelve a comprobar.', true);
+          renderDots();
+          ta.focus();
+          say(it.s.en);
+          return;
+        }
+        ta.disabled = true;
+        ta.hidden = true;
+        feedback(false, it.s.en, it.s.es, requeue());
+        say(it.s.en);
+      };
+      go.addEventListener('click', view.check);
+      say(it.s.en);
+      // Focus only with a physical keyboard; on a tablet the on-screen keyboard would cover the sentence.
+      if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) setTimeout(() => ta.focus(), 50);
+    }
+  };
+
+  /* ---------- wiring ---------- */
+
+  $('next').addEventListener('click', next);
+  $('say').addEventListener('click', () => sayCurrent(false));
+  $('slow').addEventListener('click', () => sayCurrent(true));
+  $('quit').addEventListener('click', () => { Kit.sfx('tap'); showGames(lesson); });
+  $('back-lessons').addEventListener('click', () => { Kit.sfx('tap'); showLessons(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (scr.play.hidden || document.querySelector('.k-overlay') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key !== 'Enter') return;
+    const a = document.activeElement;
+    if (a && a.tagName === 'TEXTAREA') return;
+    if (a && a.tagName === 'BUTTON' && a.id !== 'next' && a.id !== 'go') return;
+    e.preventDefault();
+    if (mode === 'feedback') next();
+    else if (mode === 'answering' && view && view.check && (game.key === 'order' || game.key === 'dict')) view.check();
+  });
+
+  Kit.mount({ slug: SLUG, title: 'Phonics' });
+  Kit.ready.then(showLessons);
+
+  // Hooks for automated checks (not used by the game itself).
+  window.__phonics = { DATA, GAMES, norm, words, align, itemsFor,
+    get item() { return queue[pos] && queue[pos].it; },
+    get state() { return { lesson: lesson && lesson.id, game: game && game.key, pos, mode, fails, score, total: results.length,
+      queue: queue.map((q) => (q.it.word || q.it.s.en) + (q.rep ? '*' : '')) }; } };
+})();
+</script>
+</body>
+</html>
